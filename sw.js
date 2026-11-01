@@ -1,5 +1,5 @@
 /* Offline shell: the app opens with no signal; data calls always go to the network. Bump VERSION on every deploy. */
-var VERSION = "cut-tracker-v1";
+var VERSION = "cut-tracker-v2";
 var SHELL = ["./", "./index.html", "./config.js", "./store.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e){

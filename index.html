@@ -238,7 +238,7 @@ button.save{background:transparent;cursor:pointer}
 .account .field{max-width:100%}
 .account form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 .account .row .btn{flex:0 0 auto}
-.appnav{display:flex;gap:6px;font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em}
+.appnav{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em}
 .appnav a{color:var(--muted);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:4px 10px;border-radius:999px}
 .appnav a:hover{color:var(--accent)}
 </style>
@@ -259,7 +259,7 @@ button.save{background:transparent;cursor:pointer}
       <button type="button" role="tab" data-tab="body" aria-selected="false">Weight</button>
       <button type="button" role="tab" data-tab="prep" aria-selected="false">Prep</button>
     </nav>
-    <nav class="appnav" aria-label="More pages"><a href="plan.html">Plan</a><a href="coach.html">Form Coach</a><a href="core.html">Core Routine</a></nav>
+    <nav class="appnav" aria-label="More pages"><a href="plan.html">Plan</a><a href="coach.html">Form Coach</a><a href="core.html">Core Routine</a><a href="cook.html">Cooking</a></nav>
   </header>
 
   <section id="account" class="card account" hidden aria-label="Account and backup"></section>

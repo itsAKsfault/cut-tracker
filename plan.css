@@ -1,0 +1,87 @@
+/* Shared styles for the reading pages: Rotation Plan, Daily Core Routine, Form Coach. */
+:root{
+  --bg:#f6f8f8; --surface:#ffffff; --ink:#15222a; --muted:#566872; --line:#d5dfe2;
+  --accent:#0a7d86; --accent-soft:#dff1f2; --si:#b4620a; --si-soft:#fbefdf; --stop:#b3261e; --stop-soft:#fbe4e2; --ok:#2e7d4f; --ok-soft:#e1f2e7;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f171b; --surface:#162227; --ink:#e3ecee; --muted:#9db0b7; --line:#2a3a41;
+  --accent:#4fc4cc; --accent-soft:#143338; --si:#f0a64a; --si-soft:#3a2a14; --stop:#f2847b; --stop-soft:#3d1c1a; --ok:#77cc98; --ok-soft:#173323; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f171b; --surface:#162227; --ink:#e3ecee; --muted:#9db0b7; --line:#2a3a41;
+  --accent:#4fc4cc; --accent-soft:#143338; --si:#f0a64a; --si-soft:#3a2a14; --stop:#f2847b; --stop-soft:#3d1c1a; --ok:#77cc98; --ok-soft:#173323; color-scheme:dark}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 64px}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:var(--display);line-height:1.1;text-wrap:balance;margin:0;letter-spacing:.01em}
+h1{font-size:clamp(2.2rem,6vw,3.4rem);font-weight:700;text-transform:uppercase}
+h2{font-size:1.9rem;font-weight:700;text-transform:uppercase}
+h3{font-size:1.35rem;font-weight:600}
+p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+section{display:flex;flex-direction:column;gap:16px}
+.lede{color:var(--muted);font-size:1.05rem}
+header{display:flex;flex-direction:column;gap:12px;border-bottom:3px solid var(--ink);padding-bottom:20px}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:.75rem;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
+.chip.you{border-color:var(--accent);color:var(--accent)}
+.chip.fr{border-color:var(--si);color:var(--si)}
+.callout{border-left:4px solid var(--stop);background:var(--stop-soft);padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.callout.si{border-color:var(--si);background:var(--si-soft)}
+.callout.ok{border-color:var(--accent);background:var(--accent-soft)}
+.callout strong{font-weight:700}
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;background:var(--bg)}
+tr:last-child td{border-bottom:0}
+td.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.82rem;white-space:nowrap}
+td.you{border-left:3px solid var(--accent)}
+td.fr{border-left:3px solid var(--si);background:color-mix(in srgb,var(--si-soft) 55%,transparent)}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.day{background:var(--surface);border:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.day b{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;color:var(--muted)}
+.day span{font-family:var(--display);font-size:1.1rem;font-weight:600;line-height:1.15}
+.day small{color:var(--muted);font-size:.78rem}
+.day.lift{border-top:4px solid var(--accent)}
+.day.rec{border-top:4px solid var(--ok)}
+.day.off{border-top:4px solid var(--line)}
+.session{display:flex;flex-direction:column;gap:12px;padding-top:8px;border-top:1px solid var(--line)}
+.session-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+.session-head .tag{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card h3{font-size:1.2rem}
+ul{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}
+.light{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.light div{padding:12px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.g{background:var(--ok-soft);border-top:4px solid var(--ok)}
+.y{background:var(--si-soft);border-top:4px solid var(--si)}
+.r{background:var(--stop-soft);border-top:4px solid var(--stop)}
+.light b{font-family:var(--mono);font-size:.78rem}
+.est{font-family:var(--mono);font-size:.68rem;color:var(--si);border:1px dashed var(--si);padding:0 5px;border-radius:3px;white-space:nowrap}
+footer{color:var(--muted);font-size:.85rem;border-top:1px solid var(--line);padding-top:16px}
+small{color:var(--muted)}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* app menu shared by every page */
+.appnav{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.08em}
+.appnav a{color:var(--muted);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:6px 10px;border-radius:999px}
+.appnav a[aria-current="page"]{border-color:var(--accent);color:var(--accent)}
+.appnav a:hover{color:var(--accent)}
+@media (max-width:760px){
+  .week{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.grid3,.light{grid-template-columns:1fr}
+}
+@media print{
+  body{background:#fff;color:#000;padding:0}
+  .session{break-inside:avoid-page}
+  .scroll{overflow:visible}
+  .appnav{display:none}
+}

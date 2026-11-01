@@ -238,6 +238,9 @@ button.save{background:transparent;cursor:pointer}
 .account .field{max-width:100%}
 .account form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
 .account .row .btn{flex:0 0 auto}
+.appnav{display:flex;gap:6px;font-family:var(--mono);font-size:.68rem;text-transform:uppercase;letter-spacing:.08em}
+.appnav a{color:var(--muted);text-decoration:none;border:1px solid var(--line);background:var(--surface);padding:4px 10px;border-radius:999px}
+.appnav a:hover{color:var(--accent)}
 </style>
 </head>
 <body>
@@ -256,6 +259,7 @@ button.save{background:transparent;cursor:pointer}
       <button type="button" role="tab" data-tab="body" aria-selected="false">Weight</button>
       <button type="button" role="tab" data-tab="prep" aria-selected="false">Prep</button>
     </nav>
+    <nav class="appnav" aria-label="More pages"><a href="plan.html">Plan</a><a href="coach.html">Form Coach</a><a href="core.html">Core Routine</a></nav>
   </header>
 
   <section id="account" class="card account" hidden aria-label="Account and backup"></section>
@@ -538,7 +542,7 @@ function renderFood(){
   h+='<section class="card"><div class="row"><h3>Activity</h3></div><div class="mini">'+
      '<label for="steps">Steps<input id="steps" type="number" inputmode="numeric" min="0" step="100" placeholder="10,000 goal" value="'+(d.steps!=null?d.steps:"")+'"></label>'+
      '<div style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)">Daily core routine<button type="button" class="toggle" data-act="core" aria-pressed="'+(!!d.core)+'">'+(d.core?"✓ Done":"Mark done")+'</button></div></div>'+
-     '<p class="note">Core moves and form: <a href="https://claude.ai/artifact/JTVqiASZ9FX7wn7PHcn3yJ" target="_blank" rel="noopener">Form Coach</a></p></section>';
+     '<p class="note">Core moves and form: <a href="coach.html">Form Coach</a></p></section>';
   h+='<section class="card chart"><div class="row"><h3>Last 7 days</h3><span class="spacer"></span><div class="legend"><span><i style="background:var(--prot)"></i>on target</span><span><i style="background:var(--warn)"></i>low</span><span><i style="background:var(--over)"></i>over</span></div></div>'+weekChart()+'<p class="note">Dashed line = your '+fmt(capNow())+' cap. Only logged days show a bar.</p></section>';
   h+='<p class="note">Calories and protein are rough estimates from typical labels, not your exact brands. Use them to compare, not as exact counts.</p>';
   document.getElementById("panel-food").innerHTML=h+'</div>';
@@ -842,7 +846,7 @@ function renderLift(){
   var h='<div class="app"><section class="card"><div class="row"><div><span class="eyebrow">'+(rot.pre?"Before week 1":"Cycle "+rot.cycle+" · Week "+wk)+'</span><h2>'+(day?esc(day.n):"Rest day")+'</h2></div><span class="spacer"></span>'+
     '<div class="seg" role="group" aria-label="Who is lifting"><button type="button" data-who="you" aria-pressed="'+(S.who==="you")+'">You</button><button type="button" data-who="friend" aria-pressed="'+(S.who==="friend")+'">Friend</button></div></div>';
   if(!day){
-    h+='<p>No lifting today. Do the full core routine, walk, and use the pool or sauna if you like.</p><p class="note">Lifting days are Mon (Push), Tue (Glutes), Thu (Pull), Sat (Circuit). Use the arrows to log a different day.</p><a class="btn" href="https://claude.ai/artifact/JTVqiASZ9FX7wn7PHcn3yJ" target="_blank" rel="noopener" style="align-self:flex-start;text-decoration:none">Open the core routine ↗</a></section></div>';
+    h+='<p>No lifting today. Do the full core routine, walk, and use the pool or sauna if you like.</p><p class="note">Lifting days are Mon (Push), Tue (Glutes), Thu (Pull), Sat (Circuit). Use the arrows to log a different day.</p><a class="btn" href="coach.html" style="align-self:flex-start;text-decoration:none">Open the core routine</a></section></div>';
     el.innerHTML=h; return;
   }
   h+='<p class="note">Weights are per side. RIR = reps you had left on your last set. Target this week: '+(S.who==="friend"?[4,3,2][wk-1]:[3,2,1][wk-1])+' left.'+(S.who==="friend"?" Pain 3+ means lighten; 5+ means stop.":"")+'</p></section>';

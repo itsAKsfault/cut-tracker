@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Form Coach · Cut Tracker</title>
+<meta name="theme-color" content="#0a7d86">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="plan.css">
+<style>
+h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;font-weight:600}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;flex-direction:row;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:10px;border-bottom:1px solid var(--line)}
+.seg{display:flex;align-items:center;gap:4px}
+.seg-label{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}
+.seg-btn{border:1px solid var(--line);background:var(--surface);padding:6px 12px;cursor:pointer;min-width:40px}
+.seg-btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.date-pick{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.date-pick input,.search input{font:inherit;font-family:var(--body);font-size:.9rem;padding:6px 8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-transform:none;letter-spacing:0}
+.save-state{font-family:var(--mono);font-size:.72rem;padding:3px 8px;border-radius:999px;border:1px dashed var(--line);color:var(--muted);text-decoration:none}
+.save-state.db{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.save-state.local{border-color:var(--si);color:var(--si)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.tab{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1px solid var(--line);background:var(--surface);padding:8px 12px;cursor:pointer;font-family:var(--display);font-size:1.05rem;font-weight:600}
+.tab small{font-family:var(--mono);font-size:.68rem;font-weight:400}
+.tab[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tab.done small{color:var(--ok);font-weight:600}
+.progress-bar{height:6px;background:var(--line)}
+.progress-bar span{display:block;height:100%;background:var(--accent);transition:width .25s}
+.moves{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.move{background:var(--surface);border:1px solid var(--line)}
+.move.checked{background:var(--ok-soft);border-color:var(--ok)}
+.move-row{display:flex;align-items:center;gap:12px;padding:12px}
+.move-row input{width:24px;height:24px;flex:0 0 auto;accent-color:var(--ok);cursor:pointer}
+.move-row label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;cursor:pointer}
+.move.checked b{text-decoration:line-through;text-decoration-color:var(--ok)}
+.rx{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.swap{font-family:var(--mono);font-size:.68rem;color:var(--si)}
+.more{flex:0 0 auto;border:1px solid var(--accent);color:var(--accent);background:transparent;padding:6px 10px;cursor:pointer;font-size:.8rem;font-weight:600}
+.how{border-top:1px solid var(--line);padding:14px}
+.how-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px}
+.how-side{display:flex;flex-direction:column;gap:12px}
+.steps{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
+.breath{background:var(--accent-soft);padding:10px 12px;border-left:3px solid var(--accent)}
+.frnote{background:var(--si-soft);padding:10px 12px;border-left:3px solid var(--si)}
+.docnote{background:var(--stop-soft);padding:10px 12px;border-left:3px solid var(--stop)}
+.demo{color:var(--accent);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{background:var(--surface);border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font-family:var(--display);font-size:2rem;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--muted)}
+.cal-wrap{display:flex;flex-direction:column;gap:8px;max-width:420px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font-family:var(--mono);font-size:.65rem;color:var(--muted);text-align:center}
+.cell{aspect-ratio:1;max-width:100%;border:1px solid var(--line);background:var(--surface);font-family:var(--mono);font-size:.7rem;cursor:pointer;color:var(--muted)}
+.cell.lv1{background:var(--accent-soft)}
+.cell.lv2{background:color-mix(in srgb,var(--ok) 45%,var(--surface));color:var(--ink)}
+.cell.lv3{background:var(--ok);color:var(--bg)}
+.cell.sel{outline:2px solid var(--ink);outline-offset:1px}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:.75rem;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border:1px solid var(--line);margin-right:4px;vertical-align:-2px}
+.legend .lv0{background:var(--surface)}.legend .lv1{background:var(--accent-soft)}.legend .lv2{background:color-mix(in srgb,var(--ok) 45%,var(--surface))}.legend .lv3{background:var(--ok)}
+.search{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);max-width:360px}
+.library{display:flex;flex-direction:column;gap:6px}
+.cat{font-size:1.1rem;margin-top:10px}
+.lib{background:var(--surface);border:1px solid var(--line)}
+.lib summary{padding:10px 12px;cursor:pointer;font-weight:600}
+@media (max-width:760px){.how-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.toolbar{position:static}}
+@media (prefers-reduced-motion:reduce){.progress-bar span{transition:none}}
+@media print{.toolbar,.more,.demo{display:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<nav class="appnav" aria-label="App pages"><a href="./">Tracker</a><a href="plan.html">Plan</a><a href="coach.html" aria-current="page">Form Coach</a><a href="core.html">Core Routine</a></nav>
+
+<header>
+  <span class="eyebrow">Every move · how to do it · how to breathe · check it off</span>
+  <h1>Form Coach</h1>
+  <p class="lede">Pick today's session, open any move for step-by-step form and breathing, and tick it off as you go. Progress saves to your account, separately for you and your friend.</p>
+</header>
+
+<div class="callout">
+  <strong>Text cues are not a substitute for watching yourself.</strong>
+  <p>I can't embed videos here, and I haven't checked specific ones, so each move links to a search for demos. The Speediance app's movement library also shows its cable moves. Film a set on your phone now and then and compare. For your friend, the physical therapist is the best form check.</p>
+</div>
+
+<section class="toolbar" aria-label="Session settings">
+  <div class="seg" role="group" aria-label="Who is training">
+    <span class="seg-label">Training as</span>
+    <button type="button" class="seg-btn" data-who="you" id="who-you">You</button>
+    <button type="button" class="seg-btn" data-who="friend" id="who-friend">Friend</button>
+  </div>
+  <div class="seg" role="group" aria-label="Rotation week">
+    <span class="seg-label">Week</span>
+    <button type="button" class="seg-btn" data-phase="1" id="ph-1">1</button>
+    <button type="button" class="seg-btn" data-phase="2" id="ph-2">2</button>
+    <button type="button" class="seg-btn" data-phase="3" id="ph-3">3</button>
+  </div>
+  <label class="date-pick" for="day">Date <input type="date" id="day"></label>
+  <a id="save-state" class="save-state" href="./">Loading…</a>
+</section>
+
+<section>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div id="session-head" class="session-head"></div>
+  <div class="progress-bar" aria-hidden="true"><span id="bar"></span></div>
+  <ol id="moves" class="moves"></ol>
+</section>
+
+<section>
+  <span class="eyebrow">Your record</span>
+  <h2>Progress</h2>
+  <div class="stats">
+    <div class="stat"><b id="st-streak">0</b><span>day streak</span></div>
+    <div class="stat"><b id="st-week">0</b><span>sessions in the last 7 days</span></div>
+    <div class="stat"><b id="st-core">0</b><span>core days in the last 21</span></div>
+    <div class="stat"><b id="st-total">0</b><span>sessions finished, all time</span></div>
+  </div>
+  <div class="cal-wrap">
+    <div class="cal" id="cal" aria-label="Last 28 days"></div>
+    <div class="legend"><span><i class="lv0"></i>nothing</span><span><i class="lv1"></i>started</span><span><i class="lv2"></i>1 session done</span><span><i class="lv3"></i>2+ done</span></div>
+  </div>
+  <p class="lede">Tap a day in the grid to open it. "Done" means every move in that session was checked.</p>
+</section>
+
+<section>
+  <span class="eyebrow">Read once</span>
+  <h2>Breathing, the short version</h2>
+  <div class="grid2">
+    <div class="card"><h3>1 · Brace before every rep</h3><p>Take a normal breath into your belly and sides, then tighten your midsection as if someone's about to poke your stomach. About 30–50% effort, not a full clench. Ribs stay down, not flared.</p></div>
+    <div class="card"><h3>2 · Exhale on the hard part</h3><p>Breathe out as you push, pull, or lift. Breathe in as you return to the start. The exhale helps keep the brace.</p></div>
+    <div class="card"><h3>3 · Keep breathing during holds</h3><p>On planks and carries, take short, steady breaths behind the brace. Count breaths instead of seconds if it helps. If you can't breathe, the hold is too hard.</p></div>
+    <div class="card"><h3>4 · Don't hold your breath long</h3><p>Holding your breath through a whole rep spikes blood pressure. That matters more for anyone with heart or blood pressure issues. At these weights you never need to.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">Every move in the plans</span>
+  <h2>Move library</h2>
+  <label class="search" for="q">Find a move <input type="search" id="q" placeholder="e.g. bridge, row, plank"></label>
+  <div id="library" class="library"></div>
+</section>
+
+<footer>
+  <p>Companion to the <a href="plan.html">Two-Person Rotation Plan</a> and <a href="core.html">Daily Core Routine</a>. Form cues are general coaching guidance, not medical advice, and not cited to specific sources. Demo links are YouTube searches, not videos I've reviewed.</p>
+</footer>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- Move content ---------- */
+var M = {
+  breath9090:{n:"90/90 breathing",c:"Core",steps:["Lie on your back with calves resting on the bench, hips and knees at 90°.","One hand on your belly, one on your lower ribs.","Breathe in through your nose for about 4 seconds, letting belly and sides widen.","Breathe out through your mouth for about 6 seconds until your ribs drop and your low back softens into the floor. Pause, then repeat."],br:"This move is the breathing. Long exhale, feel the ribs drop, short pause before the next breath.",bad:["Shoulders and chest rising instead of belly and sides","Rushing the exhale"],fr:"Safe during a flare. Good first move every day.",q:"90 90 breathing exercise"},
+  pelvicTilt:{n:"Pelvic tilt",c:"Core",steps:["Lie on your back, knees bent, feet flat, hip-width apart.","Gently flatten your low back into the floor by tilting your pelvis back.","Hold 2 seconds, then relax to a neutral arch."],br:"Exhale as you flatten. Inhale as you relax.",bad:["Pushing with your legs or lifting your hips","Big, forced range"],fr:"Small, pain-free range only.",q:"supine pelvic tilt exercise"},
+  bridge:{n:"Glute bridge",c:"Core / glutes",steps:["On your back, knees bent, feet flat and hip-width, heels about a hand's length from your butt.","Brace, then press through your heels and squeeze your glutes to lift your hips.","Stop when knees, hips, and shoulders make a straight line.","Hold 2 seconds, lower slowly."],br:"Exhale as hips rise. Inhale as you lower.",bad:["Arching the low back at the top instead of squeezing glutes","Knees falling in or out"],fr:"Both feet down. No marching or single-leg versions until the PT clears it.",q:"glute bridge proper form"},
+  clamshell:{n:"Clamshell",c:"Core / glutes",steps:["Lie on your side, hips and knees bent about 45°, head on your arm.","Stack your hips so the top hip is directly over the bottom one.","Keep feet together and lift the top knee, opening like a clamshell.","Lower slowly."],br:"Exhale as the knee opens. Inhale closing.",bad:["Rolling the top hip backward to get more range","Going fast"],fr:"Skip the band if the hip complains.",q:"clamshell exercise form"},
+  deadBug:{n:"Dead bug",c:"Core",steps:["On your back, arms straight up, hips and knees at 90° (tabletop).","Press your low back gently into the floor and keep it there.","Slowly reach one arm overhead and straighten the opposite leg toward the floor.","Return and switch sides. Phase 1: just slide one heel out at a time."],br:"Inhale at the start. Exhale slowly as the limbs reach out. Inhale as they return.",bad:["Low back peeling off the floor","Going fast or too far"],fr:"Stay on heel slides until fully pain-free.",q:"dead bug exercise proper form"},
+  birdDog:{n:"Bird dog",c:"Core",steps:["Hands under shoulders, knees under hips, back flat.","Brace and reach one arm forward and the opposite leg back, both level with your torso.","Hold, keeping hips square to the floor, then return.","Switch sides."],br:"Exhale as you reach. Breathe normally during the hold.",bad:["Hips rotating or tipping toward the lifted leg","Lifting the leg too high and arching the back"],fr:"Stop at the step where the pelvis starts to tip. Arm-only or leg-only is fine.",q:"bird dog exercise proper form"},
+  sidePlank:{n:"Side plank",c:"Core",steps:["Lie on your side, elbow under shoulder.","Knee version: knees bent behind you. Full version: legs straight, feet stacked.","Brace and lift your hips so your body forms a straight line.","Hold, then lower with control."],br:"Brace, then short, steady breaths through the hold. Never hold your breath.",bad:["Hips sagging or piking back","Shoulder shrugging up to your ear"],fr:"Knee version only.",q:"side plank proper form beginner"},
+  plank:{n:"Front plank",c:"Core",steps:["Forearms on the floor, elbows under shoulders. Or hands on the bench for the easier version.","Step back to a straight line from head to heels.","Squeeze glutes, brace, tuck ribs down slightly.","Hold."],br:"Short, steady breaths behind the brace. Count breaths if it helps.",bad:["Hips sagging (puts load on the low back)","Butt high in the air"],fr:"Hands on bench or from the knees.",q:"plank proper form beginner"},
+  pallof:{n:"Pallof press",c:"Core",steps:["Set a Speediance cable at chest height. Stand side-on, feet hip-width.","Hold the handle at your chest with both hands.","Brace and press straight out, resisting the pull toward the machine.","Hold 2 seconds, bring it back to your chest. Do all reps, then turn around."],br:"Exhale as you press out. Inhale as you bring it back.",bad:["Twisting toward the machine","Standing too close for any real pull"],fr:"Same or lighter. Square stance. Kneel on both knees if standing hurts.",q:"pallof press cable form"},
+  suitcase:{n:"Suitcase carry",c:"Core",steps:["Hold one Speediance handle at your side, cable pulling straight down.","Stand tall: ears over shoulders over hips.","Walk slowly, or march in place if the cable limits you, without leaning toward the weight."],br:"Brace, then short, steady breaths while you walk.",bad:["Leaning toward or away from the weight","Shrugging the loaded shoulder"],fr:"Skip. One-sided load.",q:"suitcase carry form"},
+  chestPress:{n:"Cable chest press",c:"Push",steps:["Bench flat between the arms, cables set low to mid height.","Lie back, feet flat on the floor, shoulder blades pulled slightly together.","Press the handles up and slightly in until arms are straight, without locking hard.","Lower slowly until handles are about chest level."],br:"Brace, exhale as you press, inhale as you lower.",bad:["Elbows flared straight out to 90°","Butt or low back lifting off the bench"],fr:"Feet flat, no arched back. Or seated upright with back support.",q:"cable bench press form"},
+  fly:{n:"Low-to-high cable fly",c:"Push",steps:["Cables set low. Stand in the middle, square stance.","Slight bend in the elbows, palms facing up and forward.","Sweep the handles up and together to about chin height.","Lower over 3 seconds."],br:"Exhale as the hands come up. Inhale lowering.",bad:["Turning it into a press by bending the elbows more","Leaning back to cheat the weight up"],fr:"Square stance, light.",q:"low to high cable fly form"},
+  shoulderPress:{n:"Shoulder press",c:"Push",steps:["Bench upright at 90°, cables low, handles at shoulder height.","Back flat against the pad, feet flat.","Press up until arms are nearly straight.","Lower to shoulder height."],br:"Brace, exhale as you press up, inhale lowering.",bad:["Arching the low back away from the pad","Pressing forward instead of up"],fr:"Seated with back support only. Skip if the low back arches.",q:"seated cable shoulder press form"},
+  lateral:{n:"Cable lateral raise",c:"Push",steps:["Cable low, handle in the hand farthest from the machine (or both cables for a 2-arm version).","Slight bend in the elbow.","Raise the arm out to the side to shoulder height, leading with the elbow.","Lower over 2–3 seconds."],br:"Exhale as the arm rises. Inhale lowering.",bad:["Shrugging the shoulder up","Swinging the body"],fr:"2-arm only, square stance. Start at 5–10 lb per side.",q:"cable lateral raise form"},
+  triceps:{n:"Triceps rope pushdown",c:"Push",steps:["Cable high with the rope. Square stance, slight forward lean.","Elbows pinned to your sides.","Push the rope down until arms are straight, spreading the ends apart at the bottom.","Return until forearms are about parallel to the floor."],br:"Exhale pushing down. Inhale on the way up.",bad:["Elbows drifting forward","Using your body weight to push"],fr:"Same. Start lighter if needed.",q:"rope tricep pushdown form"},
+  crunch:{n:"Crunch (crunch puller)",c:"Core",steps:["Set up per your crunch puller's instructions.","Brace, then curl your ribs toward your hips. Think of rolling up, not yanking.","Pause, then lower slowly."],br:"Exhale fully as you curl. Inhale on the way down.",bad:["Pulling with your neck or arms","Bouncing at the bottom"],fr:"Swap for dead bug.",note:"Your doctor flagged core weakness as the source of your aches. Consider swapping this for dead bugs until the aches settle.",q:"ab crunch machine proper form"},
+  boxSquat:{n:"Box squat",c:"Legs",steps:["Bench behind you at a height where your thighs are about parallel when seated.","Feet shoulder-width, holding the cable handles at your chest (goblet style).","Sit back and down until you lightly touch the bench, without dropping onto it.","Stand up evenly through both feet."],br:"Inhale and brace on the way down. Exhale as you stand.",bad:["Knees caving inward","Plopping onto the bench and rocking up"],fr:"Bodyweight to a higher seat. Partial depth is fine.",q:"goblet box squat form"},
+  rdl:{n:"Romanian deadlift",c:"Legs",steps:["Cables low, handles in front of your thighs, feet hip-width.","Soft knees. Push your hips back and slide the handles down your legs.","Stop when you feel a strong hamstring stretch, usually around mid-shin, back flat.","Drive hips forward to stand, squeezing glutes."],br:"Brace and inhale on the way down. Exhale as you stand.",bad:["Rounding the back","Turning it into a squat by bending the knees a lot"],fr:"Swap for cable pull-through only if the PT clears it, otherwise extra glute bridges.",q:"cable romanian deadlift form"},
+  pullThrough:{n:"Cable pull-through",c:"Legs",steps:["Cable low with the rope, face away from the machine, rope between your legs.","Push hips back, letting the rope pull through your legs, back flat.","Drive hips forward to stand tall and squeeze glutes."],br:"Inhale back. Exhale driving forward.",bad:["Pulling with the arms","Leaning back at the top"],fr:"Friend's swap for the Romanian deadlift. Only with PT clearance.",q:"cable pull through form"},
+  abduction:{n:"Standing cable hip abduction",c:"Legs",steps:["Ankle strap on the leg farther from the machine, cable low.","Hold the machine for balance, stand tall.","Lift the leg out to the side about 30–45° without leaning.","Return slowly."],br:"Exhale lifting out. Inhale returning.",bad:["Leaning your torso away","Turning the toes up"],fr:"Swap for side-lying clamshell. No single-leg standing.",q:"cable hip abduction form"},
+  situp:{n:"Sit-up (sit-up tool)",c:"Core",steps:["Feet anchored under the sit-up tool, knees bent.","Arms crossed on your chest.","Roll up one vertebra at a time, then lower slowly with control."],br:"Exhale as you come up. Inhale as you lower.",bad:["Yanking your neck","Dropping back down fast"],fr:"Skip. Do heel taps instead.",note:"Same caution as the crunch: consider swapping for heel taps while your aches settle.",q:"sit up proper form"},
+  heelTaps:{n:"Heel taps",c:"Core",steps:["On your back, knees bent at 90° in the air (tabletop).","Press your low back gently into the floor.","Slowly lower one heel to tap the floor, return, switch."],br:"Exhale as the heel lowers. Inhale as it comes back.",bad:["Low back arching off the floor"],fr:"This is the friend's swap for sit-ups.",q:"supine heel taps core exercise"},
+  pulldown:{n:"Lat pulldown",c:"Pull",steps:["Arms set high, bench upright or kneeling in front of the machine.","Grab handles, arms straight, chest up.","Pull elbows down toward your back pockets until hands reach upper chest.","Return slowly until arms are straight."],br:"Exhale as you pull down. Inhale on the way up.",bad:["Leaning way back to use body weight","Shrugging shoulders up at the top"],fr:"Seated on the bench, feet flat.",q:"cable lat pulldown form"},
+  row:{n:"Seated cable row",c:"Pull",steps:["Cables low to mid height, sit tall facing the machine, knees slightly bent.","Arms straight, chest up.","Pull the handles to your lower ribs, squeezing shoulder blades together.","Return until arms are straight, without rounding forward."],br:"Exhale as you pull. Inhale as you return.",bad:["Leaning back to finish the rep","Shrugging"],fr:"Same, lighter. No leaning back.",q:"seated cable row form"},
+  oneArmRow:{n:"Single-arm row",c:"Pull",steps:["Kneel or stand side-on with one cable at mid height.","Pull the handle to your hip, elbow close to your side.","Return slowly without letting the shoulder roll forward."],br:"Exhale pulling. Inhale returning.",bad:["Twisting the torso to move the weight"],fr:"Do 2-arm rows instead to avoid twisting.",q:"single arm cable row form"},
+  facePull:{n:"Face pull",c:"Pull",steps:["Cable at forehead height with the rope.","Pull the rope toward your face, splitting the ends past your ears.","Finish with elbows high and hands beside your head, then return."],br:"Exhale as you pull. Inhale returning.",bad:["Going heavy and leaning back","Elbows dropping low"],fr:"Same. Start at 5–10 lb per side.",q:"cable face pull form"},
+  curl:{n:"Cable biceps curl",c:"Pull",steps:["Cables low, square stance, elbows at your sides.","Curl the handles up without moving your elbows forward.","Lower over 2–3 seconds."],br:"Exhale curling up. Inhale lowering.",bad:["Swinging the back","Elbows drifting forward"],fr:"Same, square stance. Seated is fine.",q:"cable bicep curl form"},
+  woodchop:{n:"Cable woodchop",c:"Core",steps:["Cable high, stand side-on, feet wider than hips.","Hold the handle with both hands, arms nearly straight.","Rotate through your hips and upper back to pull diagonally down across your body.","Return slowly."],br:"Exhale through the chop. Inhale returning.",bad:["Bending at the low back instead of rotating the hips","Arms doing the work"],fr:"Swap for a Pallof hold. No twisting under load.",q:"cable woodchop high to low form"},
+  pushup:{n:"Push-up",c:"Push",steps:["Hands slightly wider than shoulders, body straight from head to heels (or knees).","Brace and lower your chest toward the floor, elbows about 45° from your body.","Press back up."],br:"Inhale lowering. Exhale pushing up.",bad:["Hips sagging","Head poking forward"],fr:"Incline push-ups, hands on the bench or a counter.",q:"push up proper form beginner"},
+  curlPress:{n:"Curl to overhead press",c:"Push",steps:["Cables low, square stance.","Curl the handles to your shoulders.","Press overhead, then reverse each step slowly."],br:"Exhale on the curl and again on the press. Inhale between.",bad:["Arching the low back on the press"],fr:"Curls only, seated.",q:"cable curl to press form"}
+};
+
+/* ---------- Sessions ---------- */
+var LIFT = {1:"2–3 × 12–15 · 3–4 left in the tank",2:"3 × 10–12 · 2–3 left",3:"3–4 × 8–10 · 1–2 left (friend 2–3)"};
+var S = [
+  {id:"core",t:"Core · full",sub:"Pool, walk and rest days · 10–12 min",items:[
+    ["breath9090",["5 breaths","8 breaths","8 breaths + 3 s exhale hold"]],
+    ["pelvicTilt",["10","12","15"]],
+    ["bridge",["2 × 10","2 × 12, 2 s squeeze","2 × 10 marching (friend: both feet)"]],
+    ["clamshell",["1 × 12 / side","2 × 12 / side","2 × 15 / side + band"]],
+    ["deadBug",["Heel slides 2 × 6 / side","Arm + leg 2 × 6 / side","With 5–10 lb handle 2 × 6 / side"]],
+    ["birdDog",["Arm or leg only, 6 / side","Full, 6 / side, 3 s hold","Full, 8 / side, 5 s hold"]],
+    ["sidePlank",["Knees 2 × 15 s / side","Knees 2 × 25 s / side","Full 2 × 20 s / side (friend: knees)"]],
+    ["plank",["Hands on bench 2 × 20 s","Forearms 2 × 20 s","Forearms 2 × 30 s"]],
+    ["pallof",["Skip this week","10 lb, 1 × 10 / side","15 lb, 2 × 10 / side"]],
+    ["suitcase",["Skip this week","Skip this week","15–20 lb, 2 × 30 s / side (friend: skip)"]]]},
+  {id:"coreShort",t:"Core · short",sub:"Warm-up on lifting days · 5 min",items:[
+    ["breath9090",["5 breaths","8 breaths","8 breaths"]],["pelvicTilt",["10","12","15"]],["bridge",["1 × 10","1 × 12","1 × 12"]],["deadBug",["Heel slides 1 × 6 / side","Arm + leg 1 × 6 / side","Arm + leg 1 × 8 / side"]]]},
+  {id:"A",t:"Day A · Push",sub:"Monday",items:[["chestPress"],["fly"],["shoulderPress"],["lateral"],["triceps"],["crunch",null,"deadBug"],["pallof",["3 × 10 / side"]]]},
+  {id:"B",t:"Day B · Glutes",sub:"Tuesday",items:[["bridge"],["boxSquat"],["rdl",null,"pullThrough"],["abduction",null,"clamshell"],["birdDog",["3 × 8 / side, 3 s hold"]],["sidePlank",["3 × 20–40 s (friend: knees 10–20 s)"]],["situp",["2 × 10–15"],"heelTaps"]]},
+  {id:"C",t:"Day C · Pull",sub:"Thursday",items:[["pulldown"],["row"],["oneArmRow",null,"row"],["facePull",["15 reps, light"]],["curl"],["woodchop",["3 × 10 / side"],"pallof"],["crunch",["2 × 15"],"deadBug"]]},
+  {id:"D",t:"Day D · Circuit",sub:"Saturday · 40 s on, 20 s off · rounds: wk1 2, wk2 3, wk3 3–4",items:[["pushup",["40 s"]],["row",["40 s"]],["chestPress",["40 s, light"]],["curlPress",["40 s"],"curl"],["plank",["40 s"]]]}
+];
+
+/* ---------- State ---------- */
+var st = {who:"you", phase:1, day:today(), tab:"core", logs:{}, open:{}};
+var uid=null, mode="loading", dirty={}, flushing=false;
+var PFX="fc_"; // Form Coach rows share the account's docs table with the tracker, under this prefix
+try{ var p=JSON.parse(localStorage.getItem("fc-prefs")||"{}"); if(p.who)st.who=p.who; if(p.phase)st.phase=p.phase; if(p.tab)st.tab=p.tab; }catch(e){}
+function prefs(){ try{ localStorage.setItem("fc-prefs",JSON.stringify({who:st.who,phase:st.phase,tab:st.tab})); }catch(e){} }
+
+function today(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function addDays(s,n){ var d=new Date(s+"T12:00:00"); d.setDate(d.getDate()+n); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function key(who,day){ return who+"_"+day; }
+function logOf(who,day){ return st.logs[key(who,day)] || {who:who,date:day,done:{}}; }
+function sess(id){ for(var i=0;i<S.length;i++) if(S[i].id===id) return S[i]; return S[0]; }
+function moveFor(item){ return (st.who==="friend" && item[2]) ? item[2] : item[0]; }
+function rx(s,item){
+  if(item[1]){ return item[1].length===3 ? item[1][st.phase-1] : item[1][0]; }
+  return LIFT[st.phase];
+}
+function isDone(log,s){ var d=log.done[s.id]||[]; return d.length>=s.items.length; }
+function esc(t){ var d=document.createElement("div"); d.textContent=t; return d.innerHTML; }
+
+/* ---------- Device copy ---------- */
+function localKey(){ return uid?"fc-logs-"+uid:"fc-logs"; }
+function loadLocal(k){ try{ return JSON.parse(localStorage.getItem(k||localKey())||"{}")||{}; }catch(e){ return {}; } }
+function saveLocal(){ try{ localStorage.setItem(localKey(),JSON.stringify(st.logs)); }catch(e){} }
+function saveDirty(){ if(uid) try{ localStorage.setItem("fc-dirty-"+uid,JSON.stringify(Object.keys(dirty))); }catch(e){} }
+function loadDirty(){ try{ return JSON.parse(localStorage.getItem("fc-dirty-"+uid)||"[]")||[]; }catch(e){ return []; } }
+st.logs=loadLocal("fc-logs");
+
+/* ---------- Render ---------- */
+var $=function(id){return document.getElementById(id);};
+function renderToolbar(){
+  ["you","friend"].forEach(function(w){ $("who-"+w).setAttribute("aria-pressed", st.who===w); });
+  [1,2,3].forEach(function(n){ $("ph-"+n).setAttribute("aria-pressed", st.phase===n); });
+  $("day").value=st.day;
+  var el=$("save-state"), n=Object.keys(dirty).length;
+  if(mode==="db"){ el.textContent=n?(navigator.onLine?"Syncing…":"Offline · "+n+" to sync"):"Saved to your account"; el.className="save-state "+(n?"local":"db"); }
+  else if(mode==="local"){ el.textContent=AppStore.enabled?"On this phone · Sign in":"Saved on this phone"; el.className="save-state local"; }
+  else { el.textContent="Loading…"; el.className="save-state"; }
+  el.title=mode==="local"&&AppStore.enabled?"Sign in from the tracker's top-right badge":"";
+}
+function renderTabs(){
+  var log=logOf(st.who,st.day), h="";
+  S.forEach(function(s){
+    var n=(log.done[s.id]||[]).length, done=isDone(log,s);
+    h+='<button type="button" role="tab" class="tab'+(done?" done":"")+'" aria-selected="'+(st.tab===s.id)+'" data-tab="'+s.id+'">'+esc(s.t)+'<small>'+(done?"Done":n+"/"+s.items.length)+'</small></button>';
+  });
+  $("tabs").innerHTML=h;
+}
+function card(id){
+  var m=M[id]; if(!m) return "";
+  var steps=m.steps.map(function(x){return "<li>"+esc(x)+"</li>";}).join("");
+  var bad=m.bad.map(function(x){return "<li>"+esc(x)+"</li>";}).join("");
+  var url="https://www.youtube.com/results?search_query="+encodeURIComponent(m.q);
+  return '<div class="how"><div class="how-grid">'+
+    '<div><h4>How to do it</h4><ol class="steps">'+steps+'</ol></div>'+
+    '<div class="how-side"><div class="breath"><h4>Breathing</h4><p>'+esc(m.br)+'</p></div>'+
+    '<div><h4>Common mistakes</h4><ul>'+bad+'</ul></div>'+
+    '<div class="frnote"><h4>Friend (SI-safe)</h4><p>'+esc(m.fr)+'</p></div>'+
+    (m.note?'<div class="docnote"><h4>For you</h4><p>'+esc(m.note)+'</p></div>':"")+
+    '<a class="demo" href="'+url+'" target="_blank" rel="noopener">Search demo videos ↗</a></div></div></div>';
+}
+function renderSession(){
+  var s=sess(st.tab), log=logOf(st.who,st.day), done=log.done[s.id]||[];
+  $("session-head").innerHTML='<h3>'+esc(s.t)+'</h3><span class="tag">'+esc(s.sub)+' · week '+st.phase+' · '+(st.who==="you"?"You":"Friend")+'</span>';
+  $("bar").style.width=Math.round(100*done.length/s.items.length)+"%";
+  var h="";
+  s.items.forEach(function(item,i){
+    var id=moveFor(item), m=M[id], k=s.id+":"+i, checked=done.indexOf(i)>=0, open=!!st.open[k];
+    var swapped = st.who==="friend" && item[2] ? '<span class="swap">swap for '+esc(M[item[0]].n)+'</span>' : "";
+    h+='<li class="move'+(checked?" checked":"")+'">'+
+      '<div class="move-row"><input type="checkbox" id="mv-'+k.replace(":","-")+'" data-i="'+i+'"'+(checked?" checked":"")+'>'+
+      '<label for="mv-'+k.replace(":","-")+'"><b>'+esc(m.n)+'</b>'+swapped+'<span class="rx">'+esc(rx(s,item))+'</span></label>'+
+      '<button type="button" class="more" data-k="'+k+'" aria-expanded="'+open+'">'+(open?"Hide form":"Form + breathing")+'</button></div>'+
+      (open?card(id):"")+'</li>';
+  });
+  $("moves").innerHTML=h;
+}
+function renderStats(){
+  var who=st.who, keys=Object.keys(st.logs).filter(function(k){return k.indexOf(who+"_")===0;});
+  var total=0; keys.forEach(function(k){ S.forEach(function(s){ if(isDone(st.logs[k],s)) total++; }); });
+  function cnt(day){ var l=st.logs[key(who,day)]; if(!l) return {any:false,n:0,core:false}; var n=0,any=false,core=false; S.forEach(function(s){ var d=(l.done[s.id]||[]).length; if(d) any=true; if(isDone(l,s)){ n++; if(s.id==="core"||s.id==="coreShort") core=true; } }); return {any:any,n:n,core:core}; }
+  var t=today(), streak=0, d=t;
+  if(cnt(d).n===0) d=addDays(d,-1);
+  while(cnt(d).n>0){ streak++; d=addDays(d,-1); }
+  var wk=0,core=0; for(var i=0;i<21;i++){ var c=cnt(addDays(t,-i)); if(i<7) wk+=c.n; if(c.core) core++; }
+  $("st-streak").textContent=streak; $("st-week").textContent=wk; $("st-core").textContent=core; $("st-total").textContent=total;
+  var h="", start=addDays(t,-27);
+  ["S","M","T","W","T","F","S"].forEach(function(x){ h+='<span class="dow">'+x+'</span>'; });
+  var off=new Date(start+"T12:00:00").getDay(); for(var j=0;j<off;j++) h+='<span></span>';
+  for(var k=0;k<28;k++){ var day=addDays(start,k), c2=cnt(day), lv=c2.n>=2?3:c2.n===1?2:c2.any?1:0;
+    h+='<button type="button" class="cell lv'+lv+(day===st.day?" sel":"")+'" data-day="'+day+'" title="'+day+'" aria-label="'+day+': '+(c2.n)+' sessions done">'+Number(day.slice(8))+'</button>'; }
+  $("cal").innerHTML=h;
+}
+function renderLibrary(){
+  var q=($("q").value||"").toLowerCase().trim(), cats={};
+  Object.keys(M).forEach(function(id){ var m=M[id]; if(q && (m.n+" "+m.c).toLowerCase().indexOf(q)<0) return; (cats[m.c]=cats[m.c]||[]).push(id); });
+  var h="", names=Object.keys(cats);
+  if(!names.length){ $("library").innerHTML='<p class="lede">No move matches that. Try a shorter word.</p>'; return; }
+  names.forEach(function(c){ h+='<h3 class="cat">'+esc(c)+'</h3>'; cats[c].forEach(function(id){ h+='<details class="lib"><summary>'+esc(M[id].n)+'</summary>'+card(id)+'</details>'; }); });
+  $("library").innerHTML=h;
+}
+function render(){ renderToolbar(); renderTabs(); renderSession(); renderStats(); }
+
+/* ---------- Writes ---------- */
+function flush(){
+  if(mode!=="db"||flushing) return;
+  var ids=Object.keys(dirty); if(!ids.length){ renderToolbar(); return; }
+  flushing=true; renderToolbar();
+  (function next(){
+    var k=ids.shift();
+    if(!k){ flushing=false; renderToolbar(); if(Object.keys(dirty).length&&navigator.onLine) setTimeout(flush,15000); return; }
+    var data=st.logs[k];
+    AppStore.set(PFX+k,data).then(function(){ if(st.logs[k]===data) delete dirty[k]; saveDirty(); next(); })
+      .catch(function(){ flushing=false; renderToolbar(); });
+  })();
+}
+var timer=null;
+function toggle(i,on){
+  var k=key(st.who,st.day), log=JSON.parse(JSON.stringify(logOf(st.who,st.day))), arr=log.done[st.tab]||[];
+  arr=arr.filter(function(x){return x!==i;}); if(on) arr.push(i); arr.sort(function(a,b){return a-b;});
+  log.done[st.tab]=arr; log.updated=new Date().toISOString(); st.logs[k]=log; render();
+  saveLocal();
+  if(mode==="db"){ dirty[k]=true; saveDirty(); clearTimeout(timer); timer=setTimeout(flush,400); }
+}
+
+/* ---------- Events ---------- */
+document.addEventListener("click",function(e){
+  var t=e.target.closest("button"); if(!t) return;
+  if(t.dataset.who){ st.who=t.dataset.who; prefs(); render(); }
+  else if(t.dataset.phase){ st.phase=Number(t.dataset.phase); prefs(); render(); }
+  else if(t.dataset.tab){ st.tab=t.dataset.tab; prefs(); render(); }
+  else if(t.dataset.k){ st.open[t.dataset.k]=!st.open[t.dataset.k]; renderSession(); }
+  else if(t.dataset.day){ st.day=t.dataset.day; render(); $("tabs").scrollIntoView({behavior:"smooth",block:"start"}); }
+});
+$("moves").addEventListener("change",function(e){ if(e.target.dataset.i!=null) toggle(Number(e.target.dataset.i),e.target.checked); });
+$("day").addEventListener("change",function(e){ if(e.target.value){ st.day=e.target.value; render(); } });
+$("q").addEventListener("input",renderLibrary);
+
+render(); renderLibrary();
+
+/* ---------- Account storage ---------- */
+function useDevice(){ uid=null; mode="local"; st.logs=loadLocal("fc-logs"); render(); }
+async function connect(){
+  var u=null;
+  try{ u=await AppStore.session(); }catch(e){ u=null; }
+  if(!u){ useDevice(); return; }
+  uid=u.id;
+  var cached=loadLocal(), device=loadLocal("fc-logs"), all;
+  loadDirty().forEach(function(k){ if(cached[k]) dirty[k]=true; });
+  try{ all=await AppStore.list(); }
+  catch(e){ st.logs=cached; mode="db"; render(); return; } // offline: cached copy, sync later
+  var remote={}; Object.keys(all).forEach(function(id){ if(id.indexOf(PFX)===0) remote[id.slice(PFX.length)]=all[id]; });
+  Object.keys(dirty).forEach(function(k){ remote[k]=cached[k]; });
+  // Carry over checks made on this device before signing in.
+  Object.keys(device).forEach(function(k){ var d=device[k]; if(d&&d.done&&Object.keys(d.done).length&&(!remote[k]||(d.updated||"")>(remote[k].updated||""))){ remote[k]=d; dirty[k]=true; } });
+  try{ localStorage.removeItem("fc-logs"); }catch(e){}
+  st.logs=remote; mode="db"; saveLocal(); saveDirty(); render(); flush();
+}
+async function refresh(){
+  if(mode!=="db"||flushing||Object.keys(dirty).length) return;
+  try{ var all=await AppStore.list(), remote={}; Object.keys(all).forEach(function(id){ if(id.indexOf(PFX)===0) remote[id.slice(PFX.length)]=all[id]; }); st.logs=remote; saveLocal(); render(); }catch(e){}
+}
+AppStore.onAuthChange(function(u,ev){ if(ev==="SIGNED_IN"&&!uid) connect(); });
+document.addEventListener("visibilitychange",function(){ if(!document.hidden){ flush(); refresh(); } });
+window.addEventListener("online",flush);
+window.addEventListener("offline",renderToolbar);
+connect();
+})();
+</script>
+
+</body></html>

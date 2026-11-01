@@ -1,6 +1,6 @@
 /* Offline shell: the app opens with no signal; data calls always go to the network. Bump VERSION on every deploy. */
-var VERSION = "cut-tracker-v2";
-var SHELL = ["./", "./index.html", "./config.js", "./store.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
+var VERSION = "cut-tracker-v3";
+var SHELL = ["./", "./index.html", "./config.js", "./store.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./plan.css", "./plan.html", "./coach.html", "./core.html"];
 
 self.addEventListener("install", function(e){
   e.waitUntil(caches.open(VERSION).then(function(c){ return c.addAll(SHELL); }).then(function(){ return self.skipWaiting(); }));

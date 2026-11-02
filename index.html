@@ -177,6 +177,13 @@ p{margin:0}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .note{font-size:.82rem;color:var(--muted)}
 .tip{border-left:3px solid var(--carb);background:var(--carb-soft);padding:10px 12px;border-radius:0 10px 10px 0;font-size:.86rem}
+.sheet-list .grp{font-family:var(--mono);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:8px 0 0}
+/* menus */
+.menu{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--raised)}
+.menu.on{border-color:var(--prot)}
+.menu small{color:var(--muted);font-size:.76rem}
+.peek{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px;font-size:.8rem}
+.peek i{font-style:normal;color:var(--muted);font-family:var(--mono);font-size:.72rem}
 
 /* smart add: scan a label, describe a meal, review before logging */
 .actions{display:flex;gap:8px}
@@ -303,8 +310,9 @@ button.save{background:transparent;cursor:pointer}
 "use strict";
 var CAP=1500, FLOOR=1200, PROT=150, START="2026-10-19", APP_VERSION="2026-11-02";
 
-/* ===== Foods: [id, type, name, kcal, protein, carbs, what's in it, flag] — all rough label estimates ===== */
-var F=[
+/* ===== Foods: [id, type, name, kcal, protein, carbs, what's in it, flag] — all rough label estimates.
+   CUT_FOODS is one menu (see MENUS below), loaded per account, not the default for everyone. ===== */
+var CUT_FOODS=[
  ["oats","breakfast","Overnight oats + yogurt",300,17,48,"½ cup rolled oats, ½ cup unsweetened oat milk, ½ cup plain Greek yogurt, berries, 1 tsp maple"],
  ["oatspb","breakfast","PB overnight oats",395,21,51,"The oats above + 1 tbsp peanut butter"],
  ["granbowl","breakfast","Granola yogurt bowl",285,26,34,"1 cup plain nonfat Greek yogurt, ¼ cup granola, ½ cup berries"],
@@ -354,9 +362,61 @@ var F=[
  ["honey","extra","1 tbsp honey or maple",60,0,16,""],
  ["sugar","extra","1 tsp sugar, any kind",16,0,4,"Organic cane, coconut, raw: same calories"]
 ];
-var FOOD={}; F.forEach(function(f){ FOOD[f[0]]={id:f[0],t:f[1],n:f[2],k:f[3],p:f[4],c:f[5],how:f[6],flag:f[7]||""}; });
 var SLOTS=[["breakfast","Breakfast",["breakfast"]],["lunch","Lunch",["lunch","dinner","out"]],["dinner","Dinner",["dinner","lunch","out"]],["snack","Snacks",["snack"]],["drink","Drinks",["drink"]],["extra","Extras",["extra"]]];
-var CHIPS={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",out:"Eating out",snack:"Snacks & dips",drink:"Drinks",extra:"Extras"};
+var CHIPS={breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",out:"Eating out",snack:"Snacks & dips",drink:"Drinks",extra:"Extras",recent:"Recent",basics:"Basics"};
+
+/* ===== Basics: plain foods anyone can log, grouped. Typical USDA-style label values, rounded; brands and portions vary. ===== */
+var BASICS=[
+ ["b_chicken","Protein","Chicken breast, cooked, 4 oz",185,35,0,"Skinless. About a deck and a half of cards"],
+ ["b_thigh","Protein","Chicken thigh, skinless, cooked, 4 oz",235,28,0,""],
+ ["b_turkey","Protein","93% lean ground turkey, cooked, 4 oz",220,27,0,""],
+ ["b_beef","Protein","90% lean ground beef, cooked, 4 oz",225,28,0,""],
+ ["b_sirloin","Protein","Sirloin steak, cooked, 4 oz",215,32,0,"Trimmed"],
+ ["b_pork","Protein","Pork tenderloin, cooked, 4 oz",160,30,0,""],
+ ["b_salmon","Protein","Salmon, cooked, 4 oz",235,25,0,""],
+ ["b_tuna","Protein","Canned tuna in water, 1 can drained",120,27,0,"About 4 oz drained"],
+ ["b_shrimp","Protein","Shrimp, cooked, 4 oz",110,24,1,""],
+ ["b_egg","Protein","Egg, 1 large",70,6,0,""],
+ ["b_eggwhite","Protein","Egg whites, ½ cup",60,13,1,"About 4 whites"],
+ ["b_tofu","Protein","Tofu, firm, 4 oz",90,10,2,""],
+ ["b_deliturkey","Protein","Turkey breast deli slices, 3 oz",90,16,2,"High in salt"],
+ ["b_whey","Protein","Protein powder, 1 scoop",120,24,3,"Check your tub","Varies by brand"],
+ ["b_greek","Dairy","Plain nonfat Greek yogurt, 1 cup",130,23,8,""],
+ ["b_cottage","Dairy","Cottage cheese 2%, 1 cup",180,24,8,""],
+ ["b_milk","Dairy","Milk 2%, 1 cup",120,8,12,""],
+ ["b_oatmilk","Dairy","Oat milk, unsweetened, 1 cup",90,3,14,"Check the carton","Varies by brand"],
+ ["b_cheese","Dairy","Cheddar, 1 oz",115,7,0,"About one thick slice"],
+ ["b_rice","Carbs","White rice, cooked, 1 cup",205,4,45,""],
+ ["b_brownrice","Carbs","Brown rice, cooked, 1 cup",215,5,45,""],
+ ["b_oats","Carbs","Rolled oats, ½ cup dry",150,5,27,""],
+ ["b_potato","Carbs","Potato, baked, medium",160,4,37,"About 6 oz"],
+ ["b_sweetpot","Carbs","Sweet potato, baked, medium",105,2,24,""],
+ ["b_bread","Carbs","Whole wheat bread, 1 slice",80,4,14,"Check your loaf","Varies by brand"],
+ ["b_tortilla","Carbs","Flour tortilla, 8 inch",140,4,24,""],
+ ["b_pasta","Carbs","Pasta, cooked, 1 cup",220,8,43,""],
+ ["b_quinoa","Carbs","Quinoa, cooked, 1 cup",220,8,39,""],
+ ["b_beans","Carbs","Black beans, canned, ½ cup",110,7,20,"Drained"],
+ ["b_banana","Fruit & veg","Banana, medium",105,1,27,""],
+ ["b_apple","Fruit & veg","Apple, medium",95,0,25,""],
+ ["b_orange","Fruit & veg","Orange, medium",60,1,15,""],
+ ["b_berries","Fruit & veg","Mixed berries, 1 cup",70,1,17,""],
+ ["b_broccoli","Fruit & veg","Broccoli, cooked, 1 cup",55,4,11,""],
+ ["b_veg","Fruit & veg","Non-starchy vegetables, cooked, 1 cup",50,3,10,"Green beans, peppers, zucchini, cauliflower and the like","Estimate"],
+ ["b_greens","Fruit & veg","Salad greens, 2 cups",15,1,3,"Dressing not included"],
+ ["b_avocado","Fruit & veg","Avocado, ½",120,1,6,""],
+ ["b_oil","Fats & extras","Olive or avocado oil, 1 tbsp",120,0,0,"Pour-from-the-bottle is usually 2+ tbsp"],
+ ["b_butter","Fats & extras","Butter, 1 tbsp",100,0,0,""],
+ ["b_pb","Fats & extras","Peanut butter, 1 tbsp",95,4,3,""],
+ ["b_almonds","Fats & extras","Almonds, 1 oz",165,6,6,"About 23"],
+ ["b_hummus","Fats & extras","Hummus, 2 tbsp",70,2,6,""],
+ ["b_ranch","Fats & extras","Ranch dressing, 2 tbsp",130,0,2,"Light ranch is about half","Varies by brand"],
+ ["b_coffee","Drinks","Black coffee or plain tea",5,0,1,""],
+ ["b_latte","Drinks","Latte, 12 oz, 2% milk",150,8,12,"Unsweetened. Add ~20 per pump of syrup"],
+ ["b_juice","Drinks","Orange juice, 8 oz",110,2,26,""],
+ ["b_soda","Drinks","Soda, 12 oz can",140,0,39,""],
+ ["b_beer","Drinks","Beer, 12 oz",150,1,13,"Light beer is about 100"],
+ ["b_wine","Drinks","Wine, 5 oz",125,0,4,""]
+];
 
 /* Plan by weekday (Sun=0). Sun batch feeds Sun–Tue, Wed batch Wed–Fri, Sat cook fresh. */
 var PLAN=[
@@ -402,6 +462,17 @@ var PREP={
        ["Red onion","1–2 for quick pickles"],["Jarred pickled stuff","Dill pickles, sauerkraut or kimchi, beets, red cabbage, giardiniera, banana peppers, jalapeños"],["Hummus, salsa, dry ranch seasoning","For dips"],
        ["Hot sauce, mustard, vinegar","As needed"],["EVOO + avocado oil","Have on hand"],["Seasonings","Lemon pepper, Cajun, taco, garlic-herb"],["Tea bags","For half-sweet tea at home"],["Organic cane sugar or honey","For home sweet tea. Measure with a spoon, not a pour"]]
 };
+
+/* ===== Menus: a complete menu a person can load into their own account: foods for the picker, a weekday plan, a prep checklist.
+   Nothing here is the default. Without a menu the picker offers Basics, Recent, My foods, barcode scans and typed numbers. ===== */
+var MENUS={
+ cut1500:{id:"cut1500",name:"Batch-cook cut menu",tag:"1,500 kcal · 48 foods · weekday plan · prep checklist and shopping list",
+   desc:"Chicken cooked twice a week (Sunday and Wednesday), overnight oats, veg with dips, pickled foods, home-brewed sweet tea. No eggs, deli meat, cheese or butter.",
+   foods:CUT_FOODS,plan:PLAN,batch:BATCH,prep:PREP}
+};
+var FOOD={};
+function addFoods(arr,src){arr.forEach(function(f){FOOD[f[0]]={id:f[0],t:f[1],n:f[2],k:f[3],p:f[4],c:f[5],how:f[6],flag:f[7]||"",src:src};});}
+Object.keys(MENUS).forEach(function(id){addFoods(MENUS[id].foods,id);}); addFoods(BASICS,"basics");
 
 /* ===== Helpers ===== */
 function pad(n){return String(n).padStart(2,"0");}
@@ -460,9 +531,29 @@ function startNow(){var st=S.docs.settings;return st&&/^\d{4}-\d{2}-\d{2}$/.test
 function protNow(){var st=S.docs.settings;return st&&+st.prot>=50&&+st.prot<=300?+st.prot:PROT;}
 function goalNow(){var st=S.docs.settings;return st&&+st.goal>=1&&+st.goal<=300?+st.goal:35;}
 function dayDoc(s){return S.docs["day_"+s];}
+// Menus loaded into this account. Accounts from before menus existed only ever had the cut menu, so a log that already
+// holds cut-menu foods keeps that menu until the person removes it. Loading or removing a menu writes the explicit list.
+var CUT_IDS={}; CUT_FOODS.forEach(function(f){CUT_IDS[f[0]]=1;});
+function menusOn(){
+  var st=S.docs.settings||{};
+  if(Array.isArray(st.menus)) return st.menus.filter(function(id){return !!MENUS[id];});
+  var legacy=Object.keys(S.docs).some(function(k){var d=S.docs[k];return k.indexOf("day_")===0&&d&&d.items&&d.items.some(function(it){return !!CUT_IDS[it.id];});});
+  return legacy?["cut1500"]:[];
+}
+function setMenus(arr){put("settings",Object.assign(clone(S.docs.settings||{}),{menus:arr}));}
+function activeFoods(){var out=[];menusOn().forEach(function(id){out=out.concat(MENUS[id].foods);});return out;}
+function menuWith(key){var ids=menusOn();for(var i=0;i<ids.length;i++){if(MENUS[ids[i]][key])return MENUS[ids[i]];}return null;}
 function dayItems(s){
   var d=dayDoc(s); if(d&&d.items) return {items:d.items,planned:false,doc:d};
-  return {items:PLAN[dow(s)].map(function(p){return {slot:p[0],id:p[1],q:1};}),planned:true,doc:null};
+  var m=menuWith("plan"), items=m?m.plan[dow(s)].map(function(p){return {slot:p[0],id:p[1],q:1};}):[];
+  return {items:items,planned:!!m,doc:null};
+}
+// Foods logged in the last 3 weeks, newest first, one entry per food. Custom entries come back as snapshots.
+function recentFoods(){
+  var seen={}, out=[], t=S.date;
+  for(var i=0;i<21&&out.length<40;i++){ var d=dayDoc(addDays(t,-i)); if(!d||!d.items) continue;
+    d.items.forEach(function(it){ var k=it.id==="custom"?"c:"+String(it.n||"").toLowerCase():it.id; if(seen[k]||(it.id!=="custom"&&!FOOD[it.id])) return; seen[k]=1; out.push(it); }); }
+  return out;
 }
 function itemInfo(it){ if(it.id==="custom") return {n:it.n,k:+it.k||0,p:+it.p||0,c:+it.c||0,how:it.how||"Added by you",flag:""}; return FOOD[it.id]||{n:"(removed item)",k:0,p:0,c:0,how:"",flag:""}; }
 function totals(items){var t={k:0,p:0,c:0};items.forEach(function(it){var f=itemInfo(it),q=+it.q||1;t.k+=f.k*q;t.p+=f.p*q;t.c+=f.c*q;});return t;}
@@ -530,15 +621,16 @@ function weekChart(){
 function renderFood(){
   // Blur a focused field first so its change event saves before the panel is replaced.
   var fa=document.activeElement; if(fa&&fa.closest&&fa.closest("#panel-food")&&fa.blur) fa.blur();
-  var cur=dayItems(S.date), t=totals(cur.items), st=statusFor(t,S.date), d=cur.doc||{};
+  var cur=dayItems(S.date), t=totals(cur.items), st=statusFor(t,S.date), d=cur.doc||{}, pm=menuWith("plan");
+  var yd=dayDoc(addDays(S.date,-1)), canCopy=(!cur.doc||!cur.items.length)&&yd&&yd.items&&yd.items.length;
   var h='<div class="app">';
-  if(cur.planned) h+='<div class="banner"><p><b>This is the plan for '+esc(BATCH[dow(S.date)].toLowerCase())+' day.</b> Change anything you ate differently, or log it as is.</p><button type="button" class="btn primary small" data-act="logplan">Log as planned</button></div>';
+  if(cur.planned&&pm) h+='<div class="banner"><p><b>This is the plan for '+esc(pm.batch[dow(S.date)].toLowerCase())+' day.</b> Change anything you ate differently, or log it as is.</p><button type="button" class="btn primary small" data-act="logplan">Log as planned</button></div>';
   h+='<section class="card"><div class="summary">'+ring(t.k)+'<div class="bars">'+
      bar("Protein",t.p,protNow(),"var(--prot)"," g")+bar("Carbs",t.c,150,"var(--carb)"," g")+
      '<p class="status"><span class="pill '+st[0]+'">'+esc(st[0]==="ok"?"On target":st[0]==="bad"?"Over":"Heads up")+'</span> '+esc(st[1])+'</p></div></div>';
   var xi=expInfo(); if(xi&&!xi.done&&S.date>=xi.start&&S.date<=xi.end) h+='<p class="note"><b>14-day test, day '+(Math.round((parse(S.date)-parse(xi.start))/864e5)+1)+' of 14.</b> Log everything, even the bad days, drinks and bites included.</p>';
   h+='</section>';
-  h+='<section class="card"><div class="row"><h3>Meals</h3><span class="spacer"></span><button type="button" class="btn small" data-act="scan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>Scan a barcode</button></div>';
+  h+='<section class="card"><div class="row"><h3>Meals</h3><span class="spacer"></span>'+(canCopy?'<button type="button" class="btn small" data-act="copyprev" title="Log the same meals as yesterday">Copy yesterday</button>':'')+'<button type="button" class="btn small" data-act="scan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>Scan a barcode</button></div>';
   SLOTS.forEach(function(sl){
     var list=cur.items.map(function(it,i){return {it:it,i:i};}).filter(function(x){return x.it.slot===sl[0];});
     var sk=list.reduce(function(a,x){return a+itemInfo(x.it).k*(+x.it.q||1);},0);
@@ -562,12 +654,13 @@ function renderFood(){
 }
 
 /* ===== Picker sheet ===== */
-var pick={slot:null,cat:null};
+var pick={slot:null,cat:null,recent:[]};
 function openPicker(slot){
-  var sl=SLOTS.filter(function(x){return x[0]===slot;})[0];
-  pick.slot=slot; pick.cat=sl[2][0];
+  var sl=SLOTS.filter(function(x){return x[0]===slot;})[0], af=activeFoods();
+  var cats=sl[2].filter(function(c){return af.some(function(f){return f[1]===c;});}); // only menu categories that have foods
+  pick.slot=slot; pick.cat=cats[0]||(recentFoods().length?"recent":"basics");
   document.getElementById("sheet-title").textContent=(["breakfast","lunch","dinner"].indexOf(slot)>=0?"Pick ":"Add to ")+sl[1].toLowerCase();
-  document.getElementById("sheet-chips").innerHTML=sl[2].concat(["mine","custom"]).map(function(c){return '<button type="button" data-cat="'+c+'" aria-pressed="'+(c===pick.cat)+'">'+(c==="custom"?"Type numbers":c==="mine"?"My foods":CHIPS[c])+'</button>';}).join("");
+  document.getElementById("sheet-chips").innerHTML=cats.concat(["recent","basics","mine","custom"]).map(function(c){return '<button type="button" data-cat="'+c+'" aria-pressed="'+(c===pick.cat)+'">'+(c==="custom"?"Type numbers":c==="mine"?"My foods":CHIPS[c])+'</button>';}).join("");
   document.getElementById("sheet-actions").hidden=false;
   document.getElementById("sheet-q").value="";
   renderPicker(); document.getElementById("sheet").hidden=false; if(!(window.matchMedia&&matchMedia("(pointer:coarse)").matches)) document.getElementById("sheet-q").focus();
@@ -578,21 +671,38 @@ function renderPicker(){
   qf.hidden=smart||pick.cat==="custom";
   if(pick.cat==="scan"){el.innerHTML=scanHTML();return;}
   if(pick.cat==="review"&&ai.review){el.innerHTML=reviewHTML();return;}
-  var q=qf.hidden?"":qf.value.toLowerCase().trim(), mf=myFoods();
+  var q=qf.hidden?"":qf.value.toLowerCase().trim(), mf=myFoods(), af=activeFoods();
   if(pick.cat==="mine"&&!q){
     el.innerHTML=mf.length?mf.map(mineHTML).join(""):'<p class="note">Nothing saved yet. Scan a barcode and leave "Save to My foods" checked. Saved foods show up here for every meal.</p>';
+    return;
+  }
+  if(pick.cat==="recent"&&!q){
+    pick.recent=recentFoods();
+    el.innerHTML=pick.recent.length?'<p class="note">Everything you logged in the last 3 weeks, newest first.</p>'+pick.recent.map(recentHTML).join(""):'<p class="note">Nothing logged yet. Once you log a few days, your usual foods show up here first.</p>';
+    return;
+  }
+  if(pick.cat==="basics"&&!q){
+    var groups=[]; BASICS.forEach(function(f){var g=groups.filter(function(x){return x.n===f[1];})[0]; if(!g){g={n:f[1],items:[]};groups.push(g);} g.items.push(f);});
+    el.innerHTML='<p class="note">Plain foods with typical label values, rounded. Brands and portions vary, so scan the barcode for anything packaged.'+(af.length?'':' Want a ready-made menu with a weekly plan? Load one under Account.')+'</p>'+
+      groups.map(function(g){return '<h4 class="grp">'+esc(g.n)+'</h4>'+g.items.map(optHTML).join("");}).join("");
     return;
   }
   if(pick.cat==="custom"){
     el.innerHTML='<form id="custom" class="custom"><label for="cn">What<input id="cn" class="field" required placeholder="e.g. Restaurant salad"></label><label for="ck">kcal<input id="ck" class="field" type="number" min="0" required></label><label for="cp">Protein g<input id="cp" class="field" type="number" min="0" value="0"></label><label for="cc">Carbs g<input id="cc" class="field" type="number" min="0" value="0"></label><button type="submit" class="btn primary">Add</button></form><p class="note">'+(ai.upc?'Saved to My foods with barcode '+esc(ai.upc)+', so next scan is instant. ':'')+'Use the restaurant\'s app or the package label when you can. A guess beats leaving it out.</p>';
     return;
   }
-  var items=q? F.filter(function(f){return f[2].toLowerCase().indexOf(q)>=0;}).concat(F.filter(function(f){return f[2].toLowerCase().indexOf(q)<0&&f[6].toLowerCase().indexOf(q)>=0;}))
-             : F.filter(function(f){return f[1]===pick.cat;});
+  var nameHas=function(f){return f[2].toLowerCase().indexOf(q)>=0;}, howOnly=function(f){return f[2].toLowerCase().indexOf(q)<0&&f[6].toLowerCase().indexOf(q)>=0;};
+  var items=q? af.filter(nameHas).concat(BASICS.filter(nameHas)).concat(af.filter(howOnly))
+             : af.filter(function(f){return f[1]===pick.cat;});
   var mine=q?mf.filter(function(m){return m.n.toLowerCase().indexOf(q)>=0;}):[];
   var offBtn=q.length>=3?'<div class="pane"><button type="button" class="btn ghost" data-ai="offsearch" data-q="'+esc(q)+'">Search Open Food Facts for "'+esc(q)+'"</button>'+(ai.offq===q&&ai.busy?thinking():'')+(ai.offq===q?errBox():'')+'</div>':'';
   if(ai.offq===q&&ai.offres){el.innerHTML=offListHTML()+offBtn;return;}
-  el.innerHTML=offBtn+((mine.length||items.length)?mine.map(mineHTML).join("")+items.map(function(f){var o=FOOD[f[0]];return '<button type="button" class="opt" data-pick="'+o.id+'"><span><b>'+esc(o.n)+(o.flag?' <span class="flag">· '+esc(o.flag)+'</span>':'')+'</b><small>'+esc(o.how)+'</small></span><span class="nums">'+o.k+' kcal<br>'+o.p+' g P</span></button>';}).join(""):'<p class="note">Nothing matches here. Search Open Food Facts above, scan its barcode, or use "Type numbers".</p>');
+  el.innerHTML=offBtn+((mine.length||items.length)?mine.map(mineHTML).join("")+items.map(optHTML).join(""):'<p class="note">Nothing matches here. Search Open Food Facts above, scan its barcode, or use "Type numbers".</p>');
+}
+function optHTML(f){var o=FOOD[f[0]];return '<button type="button" class="opt" data-pick="'+o.id+'"><span><b>'+esc(o.n)+(o.flag?' <span class="flag">· '+esc(o.flag)+'</span>':'')+'</b><small>'+esc(o.how)+'</small></span><span class="nums">'+o.k+' kcal<br>'+o.p+' g P</span></button>';}
+function recentHTML(it,i){
+  if(it.id!=="custom") return FOOD[it.id]?optHTML([it.id]):"";
+  return '<button type="button" class="opt" data-recent="'+i+'"><span><b>'+esc(it.n)+'</b><small>'+esc(it.how||"Added by you")+'</small></span><span class="nums">'+fmt(+it.k||0)+' kcal<br>'+fmt(+it.p||0)+' g P</span></button>';
 }
 function closePicker(){resetAI();document.getElementById("sheet").hidden=true;}
 function choose(item,alongside){
@@ -906,7 +1016,12 @@ function weightChart(data){
 
 /* ===== Render: prep ===== */
 function renderPrep(){
-  var wk=weekSunday(S.date), id="prep_"+wk, d=S.docs[id]||{c:{}}, el=document.getElementById("panel-prep");
+  var wk=weekSunday(S.date), id="prep_"+wk, d=S.docs[id]||{c:{}}, el=document.getElementById("panel-prep"), pm=menuWith("prep"), PREP=pm?pm.prep:null;
+  if(!pm){
+    el.innerHTML='<div class="app"><section class="card"><div><span class="eyebrow">Week of '+esc(parse(wk).toLocaleDateString(undefined,{month:"short",day:"numeric"}))+'</span><h2>Prep</h2></div>'+
+      '<p>The weekly prep checklist and shopping list come from a loaded menu, and no menu is loaded. Open the account panel (the badge at the top right) and load one, or skip this tab and log food your own way.</p></section></div>';
+    return;
+  }
   function list(name,arr){return arr.map(function(it,i){var k=name+i,on=!!(d.c||{})[k];return '<label class="check'+(on?" done":"")+'"><input type="checkbox" data-prep="'+k+'"'+(on?" checked":"")+'><span><b>'+esc(it[0])+'</b><small>'+esc(it[1])+'</small></span></label>';}).join("");}
   function count(name,arr){var n=0;arr.forEach(function(_,i){if((d.c||{})[name+i])n++;});return n+"/"+arr.length;}
   var h='<div class="app"><section class="card"><div><span class="eyebrow">Week of '+esc(parse(wk).toLocaleDateString(undefined,{month:"short",day:"numeric"}))+'</span><h2>Batch cooking</h2></div><p class="note">Sunday batch feeds Sun–Tue. Wednesday batch feeds Wed–Fri. Saturday: cook one fresh piece of chicken or steak. Cooked chicken keeps 3–4 days (USDA guidance). Checks reset each week.</p></section>';
@@ -941,6 +1056,7 @@ document.getElementById("panel-food").addEventListener("click",function(e){
   if(b.dataset.act==="pick") openPicker(b.dataset.slot);
   else if(b.dataset.act==="scan"){openPicker("snack");pick.cat="scan";renderPicker();}
   else if(b.dataset.act==="logplan") editDay(function(){});
+  else if(b.dataset.act==="copyprev"){var yd=dayDoc(addDays(S.date,-1));if(yd&&yd.items)editDay(function(d){d.items=clone(yd.items);});}
   else if(b.dataset.act==="core") editDay(function(d){d.core=!d.core;});
   else if(b.dataset.act==="q") editDay(function(d){var it=d.items[+b.dataset.i];var q=(+it.q||1)+(+b.dataset.d);if(q<=0)d.items.splice(+b.dataset.i,1);else it.q=Math.min(q,4);});
 });
@@ -950,6 +1066,7 @@ document.getElementById("sheet").addEventListener("click",function(e){
   if(e.target.id==="sheet"){closePicker();return;}
   var c=e.target.closest("[data-cat]");if(c){pick.cat=c.dataset.cat;ai.err="";stopCam();document.getElementById("sheet-q").value="";renderPicker();return;}
   var p=e.target.closest("[data-pick]");if(p){choose({id:p.dataset.pick,q:1});return;}
+  var rc=e.target.closest("[data-recent]");if(rc){var ri=pick.recent[+rc.dataset.recent];if(ri){var cp=clone(ri);delete cp.slot;cp.q=1;choose(cp);}return;}
   var m=e.target.closest("[data-mine]");if(m){var f=myFoods().filter(function(z){return z.id===m.dataset.mine;})[0];if(f){ai.review=fromMine(f);pick.cat="review";renderPicker();}return;}
   var u=e.target.closest("[data-unmine]");if(u){var id=u.dataset.unmine;if(ai.armed!==id){ai.armed=id;renderPicker();return;}ai.armed=null;put("myfoods",{items:myFoods().filter(function(z){return z.id!==id;})});renderPicker();return;}
   var a=e.target.closest("[data-ai]");if(a)aiClick(a);
@@ -981,7 +1098,17 @@ document.getElementById("panel-prep").addEventListener("change",function(e){var 
 render();
 
 /* ===== Account, sign-in and backup ===== */
-var acct={sent:"",err:"",busy:false,saved:false,fbBusy:false,fbSent:false,armed:false,editing:false};
+var acct={sent:"",err:"",busy:false,saved:false,fbBusy:false,fbSent:false,armed:false,editing:false,peek:null};
+function menusHTML(){
+  var on=menusOn(), h='<div class="row"><h3>Meal menus</h3></div><p class="note">A menu adds its foods to the picker, fills each day with its plan, and puts its prep checklist on the Prep tab. Load one, or skip it and log with Basics, Recent, barcode scans and your own foods. Removing a menu keeps everything you already logged.</p>';
+  Object.keys(MENUS).forEach(function(id){
+    var m=MENUS[id], ld=on.indexOf(id)>=0;
+    h+='<div class="menu'+(ld?' on':'')+'"><div class="row"><b>'+esc(m.name)+'</b><span class="spacer"></span>'+(ld?'<span class="pill ok">Loaded</span>':'')+'</div><small>'+esc(m.tag)+'</small><p class="note">'+esc(m.desc)+'</p>'+
+      '<div class="row"><button type="button" class="btn small'+(ld?' ghost':' primary')+'" data-acct="'+(ld?'menu-off':'menu-on')+'" data-id="'+id+'">'+(ld?'Remove':'Load')+'</button><button type="button" class="btn small ghost" data-acct="menu-peek" data-id="'+id+'">'+(acct.peek===id?'Hide the foods':'See the foods')+'</button></div>'+
+      (acct.peek===id?'<div class="peek">'+m.foods.map(function(f){return '<span>'+esc(f[2])+' <i>'+f[3]+'</i></span>';}).join("")+'</div>':'')+'</div>';
+  });
+  return h;
+}
 function renderAccount(){
   var el=document.getElementById("account"), u=AppStore.user(), h='';
   if(S.mode==="db"&&u){
@@ -1000,6 +1127,7 @@ function renderAccount(){
   if(acct.err) h+='<p class="err">'+esc(acct.err)+'</p>';
   h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets" novalidate><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="1" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="1" value="'+protNow()+'" required></label><label for="t-goal">Goal to lose (lb)<input id="t-goal" class="field" type="number" inputmode="numeric" min="1" max="300" step="1" value="'+goalNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
      '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are starting numbers, not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
+  h+=menusHTML();
   if(S.mode==="db"){
     h+='<div class="row"><h3>Report a problem or idea</h3></div>';
     if(acct.fbSent) h+='<p class="tip">Sent. Thanks, it lands in the owner\'s inbox for the app.</p>';
@@ -1023,7 +1151,8 @@ function renderWelcome(){
   h+=signed?'<li>You\'re signed in. Your log saves to your account and only you can see it.</li>'
            :'<li><b>Sign in</b> with your email so your log follows you between devices. Until then it stays on this phone. <button type="button" class="btn small" data-welcome="open">Sign in</button></li>';
   if(!standalone) h+='<li><b>Install it like an app:</b> '+(ios?'tap Share in Safari, then "Add to Home Screen".':'open the browser menu, then "Add to Home screen" or "Install app".')+'</li>';
-  h+='<li><b>Set your targets.</b> The calorie cap and protein goal start at default numbers. <button type="button" class="btn small" data-welcome="open">Change them</button></li></ol>';
+  h+='<li><b>Set your targets.</b> The calorie cap and protein goal start at default numbers. <button type="button" class="btn small" data-welcome="open">Change them</button></li>';
+  h+='<li><b>Pick a menu, or don\'t.</b> Log with Basics, Recent, barcode scans and your own foods, or load a ready-made menu with a weekly plan under Account.</li></ol>';
   el.innerHTML=h; el.hidden=false;
 }
 document.getElementById("welcome").addEventListener("click",function(e){
@@ -1058,6 +1187,8 @@ document.getElementById("account").addEventListener("submit",function(e){
 document.getElementById("account").addEventListener("click",function(e){
   var b=e.target.closest("[data-acct]"); if(!b) return;
   if(b.dataset.acct==="signout"){AppStore.signOut().then(function(){location.reload();});}
+  else if(b.dataset.acct==="menu-on"||b.dataset.acct==="menu-off"){var on=menusOn().filter(function(x){return x!==b.dataset.id;});if(b.dataset.acct==="menu-on")on.push(b.dataset.id);setMenus(on);render();renderAccount();}
+  else if(b.dataset.acct==="menu-peek"){acct.peek=acct.peek===b.dataset.id?null:b.dataset.id;renderAccount();}
   else if(b.dataset.acct==="disarm"){acct.armed=false;renderAccount();}
   else if(b.dataset.acct==="delete"){
     if(!acct.armed){acct.armed=true;renderAccount();return;}

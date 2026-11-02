@@ -38,8 +38,14 @@ Free-tier limits below are from my training data, so check them when you sign up
 
 ## Barcode scanning
 
-"Scan a barcode" on the food tab opens the phone camera (html5-qrcode from cdnjs, loaded only when
-the scanner is opened) and looks the product up in Open Food Facts, a free community database.
+"Scan a barcode" on the food tab opens the phone camera with getUserMedia and decodes frames with
+zxing-wasm 2.1.2 (ES module from jsdelivr, loaded only when the scanner is opened). The middle band
+of each frame (what the guide box shows) is cropped and decoded at up to 1280 px wide, with
+tryHarder and tryRotate on, so rotated and small codes read. Browsers with a native BarcodeDetector
+(Chrome on Android) are tried first per frame. Firefox has no native detector, so it always uses the
+WASM path. "Take a photo of it" is the fallback: a full-resolution still from the camera app,
+decoded the same way. A torch button appears only when the camera reports torch support.
+The product is then looked up in Open Food Facts, a free community database.
 No key is needed. Nutri-Score and NOVA group are shown when the database has them. Results are
 reviewed before logging and saved to My foods with the barcode, so repeat scans never hit the network.
 If a product is missing, "Type numbers" saves the entry under that barcode. Community data can be

@@ -180,8 +180,9 @@ p{margin:0}
 
 /* smart add: scan a label, describe a meal, review before logging */
 .actions{display:flex;gap:8px}
-#scan-view{width:100%;max-width:380px;border-radius:12px;overflow:hidden;background:#000}
-#scan-view video{width:100%!important;display:block}
+#scan-view{position:relative;width:100%;max-width:380px;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#000}
+#scan-view video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.scan-guide{position:absolute;left:4%;right:4%;top:29%;height:42%;border:2px solid rgba(255,255,255,.9);border-radius:8px;box-shadow:0 0 0 999px rgba(0,0,0,.28);pointer-events:none}
 #upc-form{display:flex;gap:8px}
 #upc-form .btn{flex:0 0 auto;white-space:nowrap}
 .grade{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -602,10 +603,10 @@ function choose(item,alongside){
   closePicker();
 }
 
-/* ===== Barcode scan: camera (html5-qrcode) → My foods → Open Food Facts. Everything is reviewed before it's logged. ===== */
+/* ===== Barcode scan: camera (getUserMedia + zxing-wasm, native BarcodeDetector when present) → My foods → Open Food Facts. Everything is reviewed before it's logged. ===== */
 var ai={busy:"",err:"",review:null,armed:null,upc:null,scanner:null,scanning:false,lib:null,offq:null,offres:null};
 var OFF_SEARCH="https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=12&fields=code,product_name,product_name_en,brands,serving_size,nutriments,nutriscore_grade,nova_group,image_front_small_url&search_terms=";
-var SCAN_LIB="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
+var ZX_URL="https://cdn.jsdelivr.net/npm/zxing-wasm@2.1.2/reader/+esm", ZX_FORMATS=["EAN-13","UPC-A","EAN-8","UPC-E"];
 var OFF_URL="https://world.openfoodfacts.org/api/v2/product/";
 function myFoods(){var d=S.docs.myfoods;return d&&d.items?d.items:[];}
 function mineHTML(m){
@@ -617,39 +618,82 @@ function thinking(){return ai.busy?'<div class="think"><span class="dot" aria-hi
 function errBox(){return ai.err?'<p class="err" role="alert">'+esc(ai.err)+'</p>':'';}
 function scanHTML(){
   var h='<div class="pane"><div id="scan-view" aria-label="Camera view"'+(ai.scanning?'':' hidden')+'></div>';
-  if(ai.scanning) h+='<div class="row"><span class="note" role="status">Point the camera at the barcode. It reads on its own.</span><span class="spacer"></span><button type="button" class="btn small" data-ai="stopcam">Stop</button></div>';
-  else if(!ai.busy) h+='<div class="row"><button type="button" class="btn primary" data-ai="cam">Open the camera</button></div>';
+  if(ai.scanning) h+='<div class="row"><span class="note" role="status">Line the barcode up inside the box, 4 to 8 inches away, level and in focus. It reads on its own.</span></div><div class="row"><button type="button" class="btn small" data-ai="stopcam">Stop</button><button type="button" class="btn small ghost" id="torch" data-ai="torch" hidden>Light</button></div>';
+  else if(!ai.busy) h+='<div class="row"><button type="button" class="btn primary" data-ai="cam">Open the camera</button><label class="btn ghost" for="scan-photo">Take a photo of it</label><input id="scan-photo" class="vh" type="file" accept="image/*" capture="environment"></div>';
   h+='<form id="upc-form"><input id="upc" class="field" inputmode="numeric" placeholder="Or type the digits under the barcode" aria-label="Barcode digits" value="'+esc(ai.upc||"")+'"><button type="submit" class="btn">Look up</button></form>';
-  h+='<p class="note">Looks the product up in <b>Open Food Facts</b>, a free community database. Entries can be missing or wrong, so check the numbers against the package. Scanned items save to My foods, so the next scan is instant.</p>';
+  h+='<p class="note">Live scan works best in good light with the barcode level. If it won\'t catch, "Take a photo" uses the full-resolution camera instead. Looks the product up in <b>Open Food Facts</b>, a free community database. Entries can be missing or wrong, so check the numbers against the package. Scanned items save to My foods, so the next scan is instant.</p>';
   return h+thinking()+errBox()+'</div>';
 }
-function loadScanLib(){
-  if(window.Html5Qrcode) return Promise.resolve();
-  if(ai.lib) return ai.lib;
-  ai.lib=new Promise(function(res,rej){var sc=document.createElement("script");sc.src=SCAN_LIB;sc.onload=res;sc.onerror=function(){ai.lib=null;rej(new Error("load"));};document.head.appendChild(sc);});
-  return ai.lib;
-}
+function loadZX(){ if(ai.lib) return ai.lib; ai.lib=import(ZX_URL).catch(function(e){ai.lib=null;throw e;}); return ai.lib; }
 function camErr(e){
   var t=String(e&&(e.name||e.message||e));
-  if(/NotAllowed|Permission|denied/i.test(t)) return "Camera access was denied. Allow it for this site in your browser settings, or type the digits.";
-  if(/NotFound|no camera|Requested device|OverconstrainedError/i.test(t)) return "No back camera found. Type the digits instead.";
+  if(/NotAllowed|Permission|denied|SecurityError/i.test(t)) return "Camera access was denied. Allow it for this site in your browser settings, or take a photo instead.";
+  if(/NotFound|no camera|Requested device|Overconstrained/i.test(t)) return "No camera found. Take a photo or type the digits instead.";
   if(/NotReadable|in use|AbortError/i.test(t)) return "The camera is busy in another app. Close it and try again.";
-  return "Couldn't start the camera. Type the digits instead.";
+  return "Couldn't start the camera. Take a photo or type the digits instead.";
+}
+var cam={stream:null,video:null,raf:0,busy:false,det:null,zx:null,last:0,track:null,canvas:null,torchOn:false,frames:0};
+async function nativeDetector(){
+  if(!("BarcodeDetector" in window)) return null;
+  try{ var sup=await window.BarcodeDetector.getSupportedFormats(); var want=["ean_13","upc_a","ean_8","upc_e"].filter(function(f){return sup.indexOf(f)>=0;}); return want.length?new window.BarcodeDetector({formats:want}):null; }catch(e){ return null; }
 }
 async function startCam(){
   if(ai.scanning||ai.busy) return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ai.err="This browser can't open a live camera here. Use \"Take a photo\" instead.";renderPicker();return;}
   ai.err=""; ai.busy="Starting the camera…"; renderPicker();
-  try{await loadScanLib();}catch(e){ai.busy="";ai.err="Couldn't load the scanner. Are you offline? Type the digits instead.";renderPicker();return;}
+  var zx=null, det=await nativeDetector();
+  try{ zx=await loadZX(); }catch(e){ zx=null; }
+  if(!zx&&!det){ai.busy="";ai.err="Couldn't load the barcode reader. Are you offline? Type the digits instead.";renderPicker();return;}
+  var stream; try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false}); }catch(e){ ai.busy=""; ai.err=camErr(e); renderPicker(); return; }
   ai.busy=""; ai.scanning=true; renderPicker(); // the camera view must exist, and must not be re-rendered while scanning
-  var F=window.Html5QrcodeSupportedFormats, sc;
-  try{
-    sc=new window.Html5Qrcode("scan-view",{formatsToSupport:F?[F.EAN_13,F.UPC_A,F.EAN_8,F.UPC_E]:undefined,experimentalFeatures:{useBarCodeDetectorIfSupported:true},verbose:false});
-    ai.scanner=sc;
-    await sc.start({facingMode:"environment"},{fps:10,aspectRatio:1.5,qrbox:function(w,h){return {width:Math.round(Math.min(w*0.85,320)),height:Math.round(Math.min(h*0.5,160))};}},
-      function(text){if(ai.scanner!==sc)return;var code=normUPC(text);if(!code)return;if(navigator.vibrate)try{navigator.vibrate(40);}catch(x){}stopCam();lookupUPC(code);},function(){});
-  }catch(e){ai.scanner=null;ai.scanning=false;ai.err=camErr(e);renderPicker();}
+  var view=document.getElementById("scan-view"); if(!view){ stream.getTracks().forEach(function(t){t.stop();}); ai.scanning=false; return; }
+  var v=document.createElement("video"); v.setAttribute("playsinline",""); v.setAttribute("muted",""); v.muted=true; v.autoplay=true; v.srcObject=stream; view.appendChild(v);
+  var guide=document.createElement("div"); guide.className="scan-guide"; view.appendChild(guide);
+  cam={stream:stream,video:v,raf:0,busy:false,det:det,zx:zx,last:0,track:stream.getVideoTracks()[0],canvas:document.createElement("canvas"),torchOn:false,frames:0};
+  try{ await v.play(); }catch(e){}
+  try{ var caps=cam.track.getCapabilities&&cam.track.getCapabilities(); var tb=document.getElementById("torch"); if(tb&&caps&&caps.torch) tb.hidden=false; }catch(e){}
+  tick();
 }
-function stopCam(){var sc=ai.scanner;ai.scanner=null;ai.scanning=false;if(sc){try{var p=sc.stop();if(p&&p.catch)p.catch(function(){});}catch(e){}}}
+function tick(){
+  if(!ai.scanning||!cam.video) return;
+  cam.raf=requestAnimationFrame(tick);
+  var now=Date.now(); if(cam.busy||now-cam.last<120) return; cam.last=now;
+  var v=cam.video; if(v.readyState<2||!v.videoWidth) return;
+  cam.busy=true;
+  (async function(){
+    try{
+      var text=null;
+      if(cam.det){ try{ var r=await cam.det.detect(v); if(r&&r.length) text=r[0].rawValue; }catch(e){} }
+      if(!text&&cam.zx){
+        // Decode the middle band of the frame (what the guide box shows), at native resolution up to 1280 wide.
+        var W=v.videoWidth,H=v.videoHeight, scale=Math.min(1,1280/W), bw=Math.round(W*0.92), bh=Math.round(H*0.42), bx=Math.round((W-bw)/2), by=Math.round((H-bh)/2);
+        var c=cam.canvas; c.width=Math.round(bw*scale); c.height=Math.round(bh*scale);
+        var g=c.getContext("2d",{willReadFrequently:true}); g.drawImage(v,bx,by,bw,bh,0,0,c.width,c.height);
+        var res=await cam.zx.readBarcodes(g.getImageData(0,0,c.width,c.height),{formats:ZX_FORMATS,tryHarder:true,tryRotate:true,maxNumberOfSymbols:1});
+        if(res&&res.length&&res[0].text) text=res[0].text;
+      }
+      cam.frames++;
+      if(text&&ai.scanning){ var code=normUPC(text); if(code){ if(navigator.vibrate)try{navigator.vibrate(40);}catch(x){} stopCam(); lookupUPC(code); return; } }
+    }catch(e){}
+    cam.busy=false;
+  })();
+}
+function stopCam(){
+  ai.scanning=false; if(cam.raf) cancelAnimationFrame(cam.raf);
+  if(cam.stream) cam.stream.getTracks().forEach(function(t){try{t.stop();}catch(e){}});
+  if(cam.video&&cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
+  cam={stream:null,video:null,raf:0,busy:false,det:null,zx:null,last:0,track:null,canvas:null,torchOn:false,frames:0};
+}
+async function toggleTorch(){ try{ var on=!cam.torchOn; await cam.track.applyConstraints({advanced:[{torch:on}]}); cam.torchOn=on; var tb=document.getElementById("torch"); if(tb) tb.textContent=on?"Light off":"Light"; }catch(e){} }
+async function scanPhoto(file){
+  if(!file) return; stopCam(); ai.err=""; ai.busy="Reading the photo…"; renderPicker();
+  var text=null;
+  try{ var zx=await loadZX(); var res=await zx.readBarcodes(file,{formats:ZX_FORMATS,tryHarder:true,tryRotate:true,maxNumberOfSymbols:1}); if(res&&res.length) text=res[0].text; }catch(e){}
+  if(!text){ try{ var d=await nativeDetector(); if(d){ var bm=await createImageBitmap(file); var r=await d.detect(bm); if(r&&r.length) text=r[0].rawValue; } }catch(e){} }
+  ai.busy=""; var code=normUPC(text);
+  if(!code){ ai.err="Couldn't find a barcode in that photo. Get closer, keep it level and sharp, or type the digits."; renderPicker(); return; }
+  lookupUPC(code);
+}
 async function lookupUPC(code){
   ai.upc=code; ai.err="";
   var hit=findUPC(code);
@@ -757,6 +801,7 @@ function aiClick(b){
   else if(a==="offsearch") offSearch(b.dataset.q);
   else if(a==="offpick"){var p=ai.offres[+b.dataset.i];ai.review=fromOFF(p,normUPC(p.code));ai.upc=normUPC(p.code);pick.cat="review";renderPicker();}
   else if(a==="stopcam"){stopCam();renderPicker();}
+  else if(a==="torch") toggleTorch();
   else if(a==="rmrow"){ai.review.rows.splice(+b.dataset.i,1);renderPicker();}
   else if(a==="q"){ai.review.q=Math.max(0.25,Math.min(10,Math.round((ai.review.q+(+b.dataset.d))*100)/100));document.getElementById("rv-q").textContent=ai.review.q+"×";document.getElementById("rv-tot").innerHTML=totHTML(ai.review);}
   else if(a==="add"||a==="along") addReview(a==="along");
@@ -907,6 +952,7 @@ document.getElementById("sheet").addEventListener("click",function(e){
   var u=e.target.closest("[data-unmine]");if(u){var id=u.dataset.unmine;if(ai.armed!==id){ai.armed=id;renderPicker();return;}ai.armed=null;put("myfoods",{items:myFoods().filter(function(z){return z.id!==id;})});renderPicker();return;}
   var a=e.target.closest("[data-ai]");if(a)aiClick(a);
 });
+document.getElementById("sheet").addEventListener("change",function(e){if(e.target.id==="scan-photo"&&e.target.files&&e.target.files[0])scanPhoto(e.target.files[0]);});
 document.getElementById("sheet").addEventListener("input",function(e){
   var t=e.target;
   if(t.id==="rv-name"&&ai.review){ai.review.name=t.value;return;}

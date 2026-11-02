@@ -505,9 +505,9 @@ function bar(label,val,goal,color,unit){
 function statusFor(t,s){
   var lift=isLift(s), CAP=capNow();
   if(t.k>CAP) return ['bad','Over '+fmt(CAP)+'. Trim tomorrow, don\'t starve today.'];
-  if(lift&&t.k<FLOOR) return ['warn','Under 1,200 on a lifting day. Add a snack: chicken bites are the best pick.'];
+  if(lift&&t.k<FLOOR) return ['warn','Under 1,200 on a lifting day. Add a protein snack.'];
   if(!lift&&t.k<1100) return ['warn','Pretty low. Add a snack so you don\'t crash tonight.'];
-  if(t.p<protNow()*0.85) return ['warn','Calories fine, protein short. Add chicken bites or a yogurt cup.'];
+  if(t.p<protNow()*0.85) return ['warn','Calories fine, protein short. Add a protein snack.'];
   return ['ok','On target'];
 }
 function weekChart(){
@@ -836,7 +836,7 @@ function rangeRow(lo,hi,max){
 function expCard(){
   var x=expInfo(), CAPN=capNow();
   if(!x) return '<section class="card"><div><span class="eyebrow">Exploratory mode</span><h2>Find your real number</h2></div>'+
-    '<p>The '+fmt(CAPN)+' cap is my estimate from averages, not from you. For 14 days, log everything you eat and weigh in every morning. The app then works out what your body actually burns.</p>'+
+    '<p>The '+fmt(CAPN)+' cap is a starting estimate from averages, not from your body. For 14 days, log everything you eat and weigh in every morning. The app then works out what your body actually burns.</p>'+
     '<ul class="rules"><li>Log every day, including drinks, bites and cooking oil. A missed day is skipped, not guessed.</li><li>Weigh in each morning: after the bathroom, before eating.</li><li>Eat normally. A "perfect" two weeks gives a number you can\'t live with.</li></ul>'+
     '<button type="button" class="btn primary" data-exp="start" style="align-self:flex-start">Start the 14-day test today</button></section>';
   var sd=function(s){return parse(s).toLocaleDateString(undefined,{month:"short",day:"numeric"});};
@@ -999,7 +999,7 @@ function renderAccount(){
   }
   if(acct.err) h+='<p class="err">'+esc(acct.err)+'</p>';
   h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets" novalidate><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="1" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="1" value="'+protNow()+'" required></label><label for="t-goal">Goal to lose (lb)<input id="t-goal" class="field" type="number" inputmode="numeric" min="1" max="300" step="1" value="'+goalNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
-     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein, 35 lb to lose), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
+     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are starting numbers, not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
   if(S.mode==="db"){
     h+='<div class="row"><h3>Report a problem or idea</h3></div>';
     if(acct.fbSent) h+='<p class="tip">Sent. Thanks, it lands in the owner\'s inbox for the app.</p>';
@@ -1023,7 +1023,7 @@ function renderWelcome(){
   h+=signed?'<li>You\'re signed in. Your log saves to your account and only you can see it.</li>'
            :'<li><b>Sign in</b> with your email so your log follows you between devices. Until then it stays on this phone. <button type="button" class="btn small" data-welcome="open">Sign in</button></li>';
   if(!standalone) h+='<li><b>Install it like an app:</b> '+(ios?'tap Share in Safari, then "Add to Home Screen".':'open the browser menu, then "Add to Home screen" or "Install app".')+'</li>';
-  h+='<li><b>Set your targets.</b> The calorie cap and protein goal start at one person\'s numbers. <button type="button" class="btn small" data-welcome="open">Change them</button></li></ol>';
+  h+='<li><b>Set your targets.</b> The calorie cap and protein goal start at default numbers. <button type="button" class="btn small" data-welcome="open">Change them</button></li></ol>';
   el.innerHTML=h; el.hidden=false;
 }
 document.getElementById("welcome").addEventListener("click",function(e){

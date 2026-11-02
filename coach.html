@@ -240,7 +240,7 @@ var S = [
 
 /* ---------- State ---------- */
 var st = {who:"you", phase:1, day:today(), tab:"core", logs:{}, lifts:{}, open:{}, openLog:{}};
-var uid=null, mode="loading", dirty={}, flushing=false, settings={};
+var uid=null, mode="loading", dirty={}, flushing=false, flushFails=0, connecting=false, settings={};
 var PFX="fc_", LPFX="lift_"; // Form Coach rows share the account's docs table with the tracker: check-offs under fc_, lift logs under lift_
 try{ var p=JSON.parse(localStorage.getItem("fc-prefs")||"{}"); if(p.who)st.who=p.who; if(p.phase)st.phase=p.phase; if(p.tab)st.tab=p.tab; }catch(e){}
 try{ var qp=new URLSearchParams(location.search); if(/^\d{4}-\d{2}-\d{2}$/.test(qp.get("d")||"")) st.day=qp.get("d"); if(qp.get("s")) st.tab=qp.get("s"); }catch(e){}
@@ -411,8 +411,8 @@ function flush(){
     var k=ids.shift();
     if(!k){ flushing=false; renderToolbar(); if(Object.keys(dirty).length&&navigator.onLine) setTimeout(flush,15000); return; }
     var data=docFor(k); if(!data){ delete dirty[k]; next(); return; }
-    AppStore.set(k,data).then(function(){ if(docFor(k)===data) delete dirty[k]; saveDirty(); next(); })
-      .catch(function(){ flushing=false; renderToolbar(); });
+    AppStore.set(k,data).then(function(){ flushFails=0; if(docFor(k)===data) delete dirty[k]; saveDirty(); next(); })
+      .catch(function(){ flushing=false; renderToolbar(); flushFails++; if(navigator.onLine) setTimeout(flush,Math.min(300000,15000*Math.pow(2,flushFails-1))); });
   })();
 }
 var timer=null;
@@ -463,7 +463,8 @@ function useDevice(){
   try{ var ct=JSON.parse(localStorage.getItem("ct-docs")||"{}")||{}; Object.keys(ct).forEach(function(id){ if(id.indexOf(LPFX)===0&&!st.lifts[id.slice(LPFX.length)]) st.lifts[id.slice(LPFX.length)]=migrateLift(ct[id]); }); }catch(e){} // lifts logged in the tracker before sign-in
   readSettings(null); render();
 }
-async function connect(){
+async function connect(){ if(connecting||uid) return; connecting=true; try{ await connectInner(); } finally{ connecting=false; } }
+async function connectInner(){
   var u=null;
   try{ u=await AppStore.session(); }catch(e){ u=null; }
   if(!u){ useDevice(); return; }

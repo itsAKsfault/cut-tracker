@@ -36,6 +36,13 @@ Free-tier limits below are from my training data, so check them when you sign up
 - After changing any file, bump `VERSION` in `sw.js` so installed copies pick up the update.
 - On each new day, the Food tab shows the meal plan as a dashed preview. It only saves once you tap "Log as planned" or change something.
 
+## Offline
+
+sw.js precaches the app shell and the Supabase browser library from jsdelivr (versioned URL, served
+cache-first), so a signed-in person who opens the app with no signal still sees their cached log and
+can keep logging; entries sync when the connection returns. Without the library cached, an offline open
+would fall back to "this phone" mode with an empty log.
+
 ## Barcode scanning
 
 "Scan a barcode" on the food tab opens the phone camera with getUserMedia and decodes frames with

@@ -428,7 +428,7 @@ function localKey(){return uid?"ct-docs-"+uid:"ct-docs";}
 function loadLocal(k){try{return JSON.parse(localStorage.getItem(k||localKey())||"{}")||{};}catch(e){return {};}}
 function saveLocal(){try{localStorage.setItem(localKey(),JSON.stringify(S.docs));}catch(e){}}
 S.docs=loadLocal();
-var uid=null,dirty={},timers={},flushing=false;
+var uid=null,dirty={},timers={},flushing=false,flushFails=0,connecting=false;
 // Unsynced ids survive a reload, so entries made offline still reach the account later.
 function saveDirty(){if(uid)try{localStorage.setItem("ct-dirty-"+uid,JSON.stringify(Object.keys(dirty)));}catch(e){}}
 function loadDirty(){try{return JSON.parse(localStorage.getItem("ct-dirty-"+uid)||"[]")||[];}catch(e){return [];}}
@@ -440,8 +440,8 @@ function flush(){
     var id=ids.shift();
     if(!id){flushing=false;renderSave();if(Object.keys(dirty).length&&navigator.onLine)setTimeout(flush,15000);return;}
     var data=S.docs[id];
-    AppStore.set(id,data).then(function(){if(S.docs[id]===data)delete dirty[id];saveDirty();next();})
-      .catch(function(){flushing=false;renderSave();});
+    AppStore.set(id,data).then(function(){flushFails=0;if(S.docs[id]===data)delete dirty[id];saveDirty();next();})
+      .catch(function(){flushing=false;renderSave();flushFails++;if(navigator.onLine)setTimeout(flush,Math.min(300000,15000*Math.pow(2,flushFails-1)));});
   })();
 }
 function put(id,data){
@@ -458,6 +458,7 @@ function clone(o){return JSON.parse(JSON.stringify(o));}
 function capNow(){var st=S.docs.settings;return st&&+st.cap>=1000&&+st.cap<=4000?+st.cap:CAP;}
 function startNow(){var st=S.docs.settings;return st&&/^\d{4}-\d{2}-\d{2}$/.test(st.start||"")?st.start:START;}
 function protNow(){var st=S.docs.settings;return st&&+st.prot>=50&&+st.prot<=300?+st.prot:PROT;}
+function goalNow(){var st=S.docs.settings;return st&&+st.goal>=1&&+st.goal<=300?+st.goal:35;}
 function dayDoc(s){return S.docs["day_"+s];}
 function dayItems(s){
   var d=dayDoc(s); if(d&&d.items) return {items:d.items,planned:false,doc:d};
@@ -484,7 +485,7 @@ function renderHeader(){
   var rel=S.date===t?"Today":S.date===addDays(t,-1)?"Yesterday":S.date===addDays(t,1)?"Tomorrow":"";
   var name=d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
   var lift=DAYS[dow(S.date)];
-  document.getElementById("dlabel").innerHTML=esc(rel?rel+" · "+name:name)+"<small>"+(rot.pre?"Plan starts "+parse(startNow()).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"Cycle "+rot.cycle+" · Week "+rot.wk)+" · "+(lift?esc(lift.n):"Rest + core day")+"</small>";
+  document.getElementById("dlabel").innerHTML=esc(rel?rel+" · "+name:name)+"<small>"+(rot.pre?"Plan starts "+parse(startNow()).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"Cycle "+rot.cycle+" · Week "+rot.wk)+" · "+(lift?esc(lift.n):"Rest + core day")+(S.date!==t?" · <u>Tap for today</u>":"")+"</small>";
   document.querySelectorAll(".tabs button").forEach(function(b){b.setAttribute("aria-selected",b.dataset.tab===S.tab);});
   ["food","body","prep"].forEach(function(p){document.getElementById("panel-"+p).hidden=p!==S.tab;});
 }
@@ -569,7 +570,7 @@ function openPicker(slot){
   document.getElementById("sheet-chips").innerHTML=sl[2].concat(["mine","custom"]).map(function(c){return '<button type="button" data-cat="'+c+'" aria-pressed="'+(c===pick.cat)+'">'+(c==="custom"?"Type numbers":c==="mine"?"My foods":CHIPS[c])+'</button>';}).join("");
   document.getElementById("sheet-actions").hidden=false;
   document.getElementById("sheet-q").value="";
-  renderPicker(); document.getElementById("sheet").hidden=false; document.getElementById("sheet-q").focus();
+  renderPicker(); document.getElementById("sheet").hidden=false; if(!(window.matchMedia&&matchMedia("(pointer:coarse)").matches)) document.getElementById("sheet-q").focus();
 }
 function renderPicker(){
   document.querySelectorAll("#sheet-chips button,#sheet-actions button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.cat===pick.cat);});
@@ -876,12 +877,12 @@ function renderBody(){
     '<p class="note">Weigh after the bathroom, before eating. Daily swings of 2–4 lb are water. Watch the 7-day average.</p></section>'+expCard();
   if(!data.length){ el.innerHTML=h+'<section class="card"><h3>Your trend shows up here</h3><p class="muted">Log your first weigh-in above. After a week you\'ll see a 7-day average line and your rate of loss.</p></section></div>'; return; }
   var start=data[0].w, last=data[data.length-1], curAvg=avg7(data,last.d), prevAvg=avg7(data,addDays(last.d,-7));
-  var lost=start-(curAvg||last.w), goal=35, rate=prevAvg&&curAvg?prevAvg-curAvg:null;
+  var lost=start-(curAvg||last.w), goal=goalNow(), rate=prevAvg&&curAvg?prevAvg-curAvg:null;
   h+='<section class="card"><div class="stats">'+
     '<div class="stat"><b>'+(curAvg?curAvg.toFixed(1):"–")+'</b><span>7-day avg (lb)</span></div>'+
     '<div class="stat"><b>'+(lost>0?"−":"")+Math.abs(lost).toFixed(1)+'</b><span>since '+esc(parse(data[0].d).toLocaleDateString(undefined,{month:"short",day:"numeric"}))+'</span></div>'+
     '<div class="stat"><b>'+(rate==null?"–":(rate>0?"−":"+")+Math.abs(rate).toFixed(1))+'</b><span>this week vs last</span></div>'+
-    '<div class="stat"><b>'+Math.max(0,Math.min(100,lost/goal*100)).toFixed(0)+'%</b><span>of 35 lb goal</span></div></div>'+
+    '<div class="stat"><b>'+Math.max(0,Math.min(100,lost/goal*100)).toFixed(0)+'%</b><span>of '+fmt(goal)+' lb goal</span></div></div>'+
     '<div class="track"><div class="fill" style="width:'+Math.max(0,Math.min(100,lost/goal*100)).toFixed(0)+'%;background:var(--prot)"></div></div>';
   if(rate!=null&&rate>2.5) h+='<p class="tip">Losing more than about 2 lb a week after the first two weeks can cost muscle. Consider 1,600–1,700 on lifting days.</p>';
   h+='</section><section class="card chart"><div class="row"><h3>Trend</h3><span class="spacer"></span><div class="legend"><span><i style="background:var(--muted)"></i>daily</span><span><i style="background:var(--accent)"></i>7-day avg</span></div></div>'+weightChart(data)+'</section></div>';
@@ -933,6 +934,7 @@ function render(){renderHeader();renderSave();if(S.tab==="food")renderFood();if(
 /* ===== Events ===== */
 document.getElementById("prev").addEventListener("click",function(){S.date=addDays(S.date,-1);render();});
 document.getElementById("next").addEventListener("click",function(){S.date=addDays(S.date,1);render();});
+document.getElementById("dlabel").addEventListener("click",function(){if(S.date!==today()){S.date=today();render();}});
 document.querySelector(".tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;S.tab=b.dataset.tab;prefs();render();window.scrollTo(0,0);});
 document.getElementById("panel-food").addEventListener("click",function(e){
   var b=e.target.closest("[data-act]"); if(!b) return;
@@ -996,8 +998,8 @@ function renderAccount(){
        '<p class="note">This copy isn\'t connected to a database yet, so entries stay on this device. Export a backup now and then.</p>';
   }
   if(acct.err) h+='<p class="err">'+esc(acct.err)+'</p>';
-  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets" novalidate><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="1" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="1" value="'+protNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
-     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
+  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets" novalidate><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="1" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="1" value="'+protNow()+'" required></label><label for="t-goal">Goal to lose (lb)<input id="t-goal" class="field" type="number" inputmode="numeric" min="1" max="300" step="1" value="'+goalNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
+     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein, 35 lb to lose), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
   if(S.mode==="db"){
     h+='<div class="row"><h3>Report a problem or idea</h3></div>';
     if(acct.fbSent) h+='<p class="tip">Sent. Thanks, it lands in the owner\'s inbox for the app.</p>';
@@ -1008,7 +1010,7 @@ function renderAccount(){
   h+='<div class="row"><button type="button" class="btn small ghost" data-acct="export">Export backup</button>'+
      '<label class="btn small ghost" for="import-file" style="cursor:pointer">Import backup</label><input id="import-file" type="file" accept="application/json,.json" class="vh"></div>';
   // Keep whatever the person is typing when the card re-renders (sync status changes often).
-  var keepIds=["email","fb-kind","fb-msg","t-cap","t-prot","t-start"], keep={}, focusId=document.activeElement&&document.activeElement.id;
+  var keepIds=["email","fb-kind","fb-msg","t-cap","t-prot","t-goal","t-start"], keep={}, focusId=document.activeElement&&document.activeElement.id;
   keepIds.forEach(function(id){var f=document.getElementById(id);if(f&&f.value!==""&&(id==="fb-kind"||id==="fb-msg"||id==="email"||focusId===id||(acct.editing&&id.indexOf("t-")===0)))keep[id]=f.value;});
   el.innerHTML=h;
   Object.keys(keep).forEach(function(id){var f=document.getElementById(id);if(f){f.value=keep[id];if(focusId===id)f.focus();}});
@@ -1040,12 +1042,13 @@ document.getElementById("account").addEventListener("submit",function(e){
   if(e.target.id==="fb"){e.preventDefault();var msg=document.getElementById("fb-msg").value.trim();if(!msg||acct.fbBusy)return;acct.fbBusy=true;acct.err="";renderAccount();
     AppStore.feedback(document.getElementById("fb-kind").value,msg.slice(0,2000),location.pathname,{ua:navigator.userAgent,app:APP_VERSION,online:navigator.onLine,unsynced:Object.keys(dirty).length,standalone:!!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)})
       .then(function(){acct.fbSent=true;setTimeout(function(){acct.fbSent=false;},8000);}).catch(function(err){acct.err="Couldn't send: "+(err&&err.message||"try again.");}).then(function(){acct.fbBusy=false;renderAccount();});return;}
-  if(e.target.id==="targets"){e.preventDefault();var cap=Math.round(+document.getElementById("t-cap").value),pr=Math.round(+document.getElementById("t-prot").value),sd=document.getElementById("t-start").value;acct.err="";
+  if(e.target.id==="targets"){e.preventDefault();var cap=Math.round(+document.getElementById("t-cap").value),pr=Math.round(+document.getElementById("t-prot").value),gl=Math.round(+document.getElementById("t-goal").value),sd=document.getElementById("t-start").value;acct.err="";
     if(!(cap>=1000&&cap<=4000)) acct.err="Calorie cap must be a number from 1,000 to 4,000.";
     else if(!(pr>=50&&pr<=300)) acct.err="Protein must be a number from 50 to 300 g.";
+    else if(!(gl>=1&&gl<=300)) acct.err="Goal to lose must be a number from 1 to 300 lb.";
     else if(!/^\d{4}-\d{2}-\d{2}$/.test(sd)) acct.err="Pick a plan start date.";
     if(acct.err){renderAccount();return;}
-    acct.editing=false;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr,start:sd}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
+    acct.editing=false;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr,goal:gl,start:sd}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
   if(e.target.id!=="signin") return; e.preventDefault();
   var email=document.getElementById("email").value.trim(); if(!email) return;
   acct.busy=true;acct.err="";renderAccount();
@@ -1084,7 +1087,8 @@ document.getElementById("account").addEventListener("change",function(e){
 /* ===== Boot: account if signed in, otherwise this device ===== */
 function focusedInPanel(){var a=document.activeElement;return a&&a.closest&&a.closest(".panel")&&/INPUT|SELECT/.test(a.tagName);}
 function useDevice(){uid=null;S.mode="local";S.docs=loadLocal("ct-docs");render();renderWelcome();}
-async function connect(){
+async function connect(){ if(connecting||uid) return; connecting=true; try{ await connectInner(); } finally{ connecting=false; } }
+async function connectInner(){
   var u=null;
   try{u=await AppStore.session();}catch(e){u=null;}
   if(!u){useDevice();return;}

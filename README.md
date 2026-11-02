@@ -49,3 +49,17 @@ wrong; the app says so on the review screen.
 
 Calorie cap and protein target are per account (Settings in the account card under the badge).
 Defaults are 1,500 kcal and 150 g.
+
+## Where things live (after 2 Nov 2026)
+
+- **Form Coach** (`coach.html`) is the only lift log: sets, weights per side, RIR, pain, and
+  next-time hints. The tracker's old Lift tab is gone; its history was carried over (old keys map
+  to Form Coach move ids in `migrateLift`). Rows: `lift_<who>_<date>`; check-offs: `fc_<who>_<date>`.
+- **Plan start date** lives in Settings (`settings.start`). The tracker and Form Coach derive the
+  rotation week from it.
+- **Feedback**: "Report a problem or idea" in the account card writes to the `feedback` table.
+  Read it in Supabase → Table Editor → feedback. Only the owner sees all rows.
+- **Delete my data**: erases the person's rows and local caches, then signs out. The login itself
+  is deleted from Supabase → Authentication → Users.
+- **Food search**: the picker can search Open Food Facts by name (explicit button, so the public
+  search API isn't hammered).

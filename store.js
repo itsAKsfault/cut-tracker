@@ -43,6 +43,16 @@
     set: async function(id, data){
       var r = await sb.from("docs").upsert({ user_id: user.id, id: id, data: data, updated_at: new Date().toISOString() }, { onConflict: "user_id,id" });
       if (r.error) throw r.error;
+    },
+    // Erases every row this person owns. Their login stays; deleting that needs the project dashboard.
+    deleteAll: async function(){
+      var r = await sb.from("docs").delete().eq("user_id", user.id);
+      if (r.error) throw r.error;
+    },
+    // A problem report or idea, kept in a table only the project owner reads in full.
+    feedback: async function(kind, message, page, diag){
+      var r = await sb.from("feedback").insert({ user_id: user.id, email: user.email || null, kind: kind, message: message, page: page, diag: diag });
+      if (r.error) throw r.error;
     }
   };
 })();

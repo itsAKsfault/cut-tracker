@@ -190,6 +190,9 @@ p{margin:0}
 .account form.targets{grid-template-columns:repeat(2,minmax(0,1fr)) auto;align-items:end}
 .account form.targets label{display:flex;flex-direction:column;gap:3px;font-size:.74rem;color:var(--muted)}
 .account ol{margin:0;padding-left:18px;font-size:.88rem;display:flex;flex-direction:column;gap:6px}
+.account form.fb{grid-template-columns:1fr}
+.account form.fb textarea{font:inherit;resize:vertical}
+.btn.danger{background:var(--over);border-color:var(--over);color:#fff}
 .act{display:flex;align-items:center;gap:8px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:12px;padding:10px 12px;font-weight:700;font-size:.88rem;text-align:left;line-height:1.2}
 .act svg{flex:0 0 auto}
 .act[aria-pressed="true"]{background:var(--accent);color:var(--bg)}
@@ -265,7 +268,6 @@ button.save{background:transparent;cursor:pointer}
     </div>
     <nav class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="food" aria-selected="true">Food</button>
-      <button type="button" role="tab" data-tab="lift" aria-selected="false">Lift</button>
       <button type="button" role="tab" data-tab="body" aria-selected="false">Weight</button>
       <button type="button" role="tab" data-tab="prep" aria-selected="false">Prep</button>
     </nav>
@@ -276,7 +278,6 @@ button.save{background:transparent;cursor:pointer}
   <section id="account" class="card account" hidden aria-label="Account and backup"></section>
 
   <main id="panel-food" class="panel"></main>
-  <main id="panel-lift" class="panel" hidden></main>
   <main id="panel-body" class="panel" hidden></main>
   <main id="panel-prep" class="panel" hidden></main>
 </div>
@@ -299,7 +300,7 @@ button.save{background:transparent;cursor:pointer}
 <script>
 (function(){
 "use strict";
-var CAP=1500, FLOOR=1200, PROT=150, START="2026-10-19";
+var CAP=1500, FLOOR=1200, PROT=150, START="2026-10-19", APP_VERSION="2026-11-02";
 
 /* ===== Foods: [id, type, name, kcal, protein, carbs, what's in it, flag] — all rough label estimates ===== */
 var F=[
@@ -412,14 +413,14 @@ function esc(t){var d=document.createElement("div");d.textContent=t==null?"":Str
 function fmt(n){return Math.round(n).toLocaleString();}
 function weekSunday(s){return addDays(s,-dow(s));}
 function rotation(s){
-  var days=Math.round((parse(s)-parse(START))/86400000);
+  var days=Math.round((parse(s)-parse(startNow()))/86400000);
   if(days<0) return {wk:1,cycle:0,pre:true};
   return {wk:Math.floor(days/7)%3+1,cycle:Math.floor(days/21)+1,pre:false};
 }
 
 /* ===== Store (account db with browser fallback) ===== */
 var S={tab:"food",date:today(),who:"you",docs:{},mode:"loading"};
-try{var pr=JSON.parse(localStorage.getItem("ct-prefs")||"{}");if(pr.tab)S.tab=pr.tab;if(pr.who)S.who=pr.who;}catch(e){}
+try{var pr=JSON.parse(localStorage.getItem("ct-prefs")||"{}");if(pr.tab&&pr.tab!=="lift")S.tab=pr.tab;if(pr.who)S.who=pr.who;}catch(e){}
 function prefs(){try{localStorage.setItem("ct-prefs",JSON.stringify({tab:S.tab,who:S.who}));}catch(e){}}
 // Device copy: "ct-docs" before sign-in, "ct-docs-<user id>" as an offline cache of that person's account.
 function localKey(){return uid?"ct-docs-"+uid:"ct-docs";}
@@ -454,6 +455,7 @@ function clone(o){return JSON.parse(JSON.stringify(o));}
 
 /* ===== Food logic ===== */
 function capNow(){var st=S.docs.settings;return st&&+st.cap>=1000&&+st.cap<=4000?+st.cap:CAP;}
+function startNow(){var st=S.docs.settings;return st&&/^\d{4}-\d{2}-\d{2}$/.test(st.start||"")?st.start:START;}
 function protNow(){var st=S.docs.settings;return st&&+st.prot>=50&&+st.prot<=300?+st.prot:PROT;}
 function dayDoc(s){return S.docs["day_"+s];}
 function dayItems(s){
@@ -481,9 +483,9 @@ function renderHeader(){
   var rel=S.date===t?"Today":S.date===addDays(t,-1)?"Yesterday":S.date===addDays(t,1)?"Tomorrow":"";
   var name=d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"});
   var lift=DAYS[dow(S.date)];
-  document.getElementById("dlabel").innerHTML=esc(rel?rel+" · "+name:name)+"<small>"+(rot.pre?"Plan starts Mon Oct 19":"Cycle "+rot.cycle+" · Week "+rot.wk)+" · "+(lift?esc(lift.n):"Rest + core day")+"</small>";
+  document.getElementById("dlabel").innerHTML=esc(rel?rel+" · "+name:name)+"<small>"+(rot.pre?"Plan starts "+parse(startNow()).toLocaleDateString(undefined,{month:"short",day:"numeric"}):"Cycle "+rot.cycle+" · Week "+rot.wk)+" · "+(lift?esc(lift.n):"Rest + core day")+"</small>";
   document.querySelectorAll(".tabs button").forEach(function(b){b.setAttribute("aria-selected",b.dataset.tab===S.tab);});
-  ["food","lift","body","prep"].forEach(function(p){document.getElementById("panel-"+p).hidden=p!==S.tab;});
+  ["food","body","prep"].forEach(function(p){document.getElementById("panel-"+p).hidden=p!==S.tab;});
 }
 
 /* ===== Render: food ===== */
@@ -551,7 +553,7 @@ function renderFood(){
   h+='<section class="card"><div class="row"><h3>Activity</h3></div><div class="mini">'+
      '<label for="steps">Steps<input id="steps" type="number" inputmode="numeric" min="0" step="100" placeholder="10,000 goal" value="'+(d.steps!=null?d.steps:"")+'"></label>'+
      '<div style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;color:var(--muted)">Daily core routine<button type="button" class="toggle" data-act="core" aria-pressed="'+(!!d.core)+'">'+(d.core?"✓ Done":"Mark done")+'</button></div></div>'+
-     '<p class="note">Core moves and form: <a href="coach.html">Form Coach</a></p></section>';
+     '<p class="note">'+(isLift(S.date)?'<b>'+esc(DAYS[dow(S.date)].n)+'.</b> Log sets, weights and form in <a href="coach.html?s='+({1:"A",2:"B",4:"C",6:"D"})[dow(S.date)]+'&d='+S.date+'">Form Coach</a>.':'Rest day. Core moves and form: <a href="coach.html?d='+S.date+'">Form Coach</a>.')+'</p></section>';
   h+='<section class="card chart"><div class="row"><h3>Last 7 days</h3><span class="spacer"></span><div class="legend"><span><i style="background:var(--prot)"></i>on target</span><span><i style="background:var(--warn)"></i>low</span><span><i style="background:var(--over)"></i>over</span></div></div>'+weekChart()+'<p class="note">Dashed line = your '+fmt(capNow())+' cap. Only logged days show a bar.</p></section>';
   h+='<p class="note">Calories and protein are rough estimates from typical labels, not your exact brands. Use them to compare, not as exact counts.</p>';
   document.getElementById("panel-food").innerHTML=h+'</div>';
@@ -586,7 +588,9 @@ function renderPicker(){
   var items=q? F.filter(function(f){return f[2].toLowerCase().indexOf(q)>=0;}).concat(F.filter(function(f){return f[2].toLowerCase().indexOf(q)<0&&f[6].toLowerCase().indexOf(q)>=0;}))
              : F.filter(function(f){return f[1]===pick.cat;});
   var mine=q?mf.filter(function(m){return m.n.toLowerCase().indexOf(q)>=0;}):[];
-  el.innerHTML=(mine.length||items.length)?mine.map(mineHTML).join("")+items.map(function(f){var o=FOOD[f[0]];return '<button type="button" class="opt" data-pick="'+o.id+'"><span><b>'+esc(o.n)+(o.flag?' <span class="flag">· '+esc(o.flag)+'</span>':'')+'</b><small>'+esc(o.how)+'</small></span><span class="nums">'+o.k+' kcal<br>'+o.p+' g P</span></button>';}).join(""):'<p class="note">Nothing matches. Scan its barcode, or use "Type numbers".</p>';
+  var offBtn=q.length>=3?'<div class="pane"><button type="button" class="btn ghost" data-ai="offsearch" data-q="'+esc(q)+'">Search Open Food Facts for "'+esc(q)+'"</button>'+(ai.offq===q&&ai.busy?thinking():'')+(ai.offq===q?errBox():'')+'</div>':'';
+  if(ai.offq===q&&ai.offres){el.innerHTML=offListHTML()+offBtn;return;}
+  el.innerHTML=offBtn+((mine.length||items.length)?mine.map(mineHTML).join("")+items.map(function(f){var o=FOOD[f[0]];return '<button type="button" class="opt" data-pick="'+o.id+'"><span><b>'+esc(o.n)+(o.flag?' <span class="flag">· '+esc(o.flag)+'</span>':'')+'</b><small>'+esc(o.how)+'</small></span><span class="nums">'+o.k+' kcal<br>'+o.p+' g P</span></button>';}).join(""):'<p class="note">Nothing matches here. Search Open Food Facts above, scan its barcode, or use "Type numbers".</p>');
 }
 function closePicker(){resetAI();document.getElementById("sheet").hidden=true;}
 function choose(item,alongside){
@@ -599,7 +603,8 @@ function choose(item,alongside){
 }
 
 /* ===== Barcode scan: camera (html5-qrcode) → My foods → Open Food Facts. Everything is reviewed before it's logged. ===== */
-var ai={busy:"",err:"",review:null,armed:null,upc:null,scanner:null,scanning:false,lib:null};
+var ai={busy:"",err:"",review:null,armed:null,upc:null,scanner:null,scanning:false,lib:null,offq:null,offres:null};
+var OFF_SEARCH="https://world.openfoodfacts.org/cgi/search.pl?search_simple=1&action=process&json=1&page_size=12&fields=code,product_name,product_name_en,brands,serving_size,nutriments,nutriscore_grade,nova_group,image_front_small_url&search_terms=";
 var SCAN_LIB="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
 var OFF_URL="https://world.openfoodfacts.org/api/v2/product/";
 function myFoods(){var d=S.docs.myfoods;return d&&d.items?d.items:[];}
@@ -678,6 +683,24 @@ function fromOFF(p,code){
     grade:/^[a-e]$/.test(String(p.nutriscore_grade||""))?String(p.nutriscore_grade):null,nova:+p.nova_group>=1&&+p.nova_group<=4?+p.nova_group:null,img:p.image_front_small_url||null,
     rows:[{name:perServ?"Per serving":"Per 100 g",k:g("energy-kcal"),p:g("proteins"),c:g("carbohydrates"),f:g("fat"),na:na,sug:g("sugars")}],notes:notes};
 }
+async function offSearch(q){
+  if(ai.busy) return;
+  ai.offq=q; ai.offres=null; ai.err=""; ai.busy="Searching Open Food Facts…"; renderPicker();
+  var ctl=new AbortController(), tm=setTimeout(function(){ctl.abort();},12000);
+  try{
+    var r=await fetch(OFF_SEARCH+encodeURIComponent(q),{signal:ctl.signal}); clearTimeout(tm);
+    var j=await r.json(); ai.busy="";
+    ai.offres=(j&&j.products||[]).filter(function(p){return p.code&&(p.product_name||p.product_name_en)&&p.nutriments&&(p.nutriments["energy-kcal_serving"]!=null||p.nutriments["energy-kcal_100g"]!=null);}).slice(0,10);
+    if(!ai.offres.length){ai.offres=null;ai.err="Nothing in Open Food Facts for that. Try a brand name, or \"Type numbers\".";}
+    renderPicker();
+  }catch(e){clearTimeout(tm);ai.busy="";ai.err=e&&e.name==="AbortError"?"Open Food Facts didn't answer in time. Try again.":"Couldn't reach Open Food Facts. Offline?";renderPicker();}
+}
+function offListHTML(){
+  return '<p class="note">From Open Food Facts. Tap one to check its numbers.</p>'+ai.offres.map(function(p,i){
+    var R=fromOFF(p,normUPC(p.code)), row=R.rows[0];
+    return '<button type="button" class="opt" data-ai="offpick" data-i="'+i+'"><span><b>'+esc(R.name)+'</b><small>'+esc(R.serving)+(R.grade?' · Nutri-Score '+R.grade.toUpperCase():'')+'</small></span><span class="nums">'+(row.k!=null?fmt(row.k):"?")+' kcal<br>'+(row.p!=null?fmt(row.p):"?")+' g P</span></button>';
+  }).join("");
+}
 function gradeHTML(R){
   var NS={a:"#1e8f4e",b:"#85bb2f",c:"#f3c300",d:"#ee8100",e:"#e63e11"}, NOVA=["","Unprocessed","Processed ingredient","Processed","Ultra-processed"];
   var h='<div class="grade">'+(R.img?'<img class="off-img" src="'+esc(R.img)+'" alt="" loading="lazy">':'');
@@ -725,12 +748,14 @@ function addReview(alongside){
   var item={id:"custom",n:name,k:Math.round(t.k),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f),how:how,q:R.q,src:R.src};
   resetAI(); choose(item,alongside);
 }
-function resetAI(){stopCam();ai.review=null;ai.err="";ai.busy="";ai.armed=null;ai.upc=null;}
+function resetAI(){stopCam();ai.review=null;ai.err="";ai.busy="";ai.armed=null;ai.upc=null;ai.offq=null;ai.offres=null;}
 function normUPC(v){var d=String(v||"").replace(/\D/g,"");if(d.length<8||d.length>14)return null;return d.length===12?"0"+d:d;} // UPC-A and EAN-13 compare equal
 function findUPC(code){if(!code)return null;return myFoods().filter(function(m){return m.upc===code;})[0]||null;}
 function aiClick(b){
   var a=b.dataset.ai;
   if(a==="cam") startCam();
+  else if(a==="offsearch") offSearch(b.dataset.q);
+  else if(a==="offpick"){var p=ai.offres[+b.dataset.i];ai.review=fromOFF(p,normUPC(p.code));ai.upc=normUPC(p.code);pick.cat="review";renderPicker();}
   else if(a==="stopcam"){stopCam();renderPicker();}
   else if(a==="rmrow"){ai.review.rows.splice(+b.dataset.i,1);renderPicker();}
   else if(a==="q"){ai.review.q=Math.max(0.25,Math.min(10,Math.round((ai.review.q+(+b.dataset.d))*100)/100));document.getElementById("rv-q").textContent=ai.review.q+"×";document.getElementById("rv-tot").innerHTML=totHTML(ai.review);}
@@ -794,72 +819,6 @@ function expCard(){
 }
 
 /* ===== Render: lift ===== */
-function hintFor(e,who,wk){
-  var tgt=who==="friend"?[4,3,2][wk-1]:[3,2,1][wk-1];
-  if(!e) return null;
-  var pain=e.pain===""||e.pain==null?null:+e.pain, rir=e.rir===""||e.rir==null?null:+e.rir;
-  if(pain!=null&&pain>=5) return ["stop","Stop: skip this next time and ask the PT"];
-  if(pain!=null&&pain>=3) return ["down","Lighten it or shorten the range"];
-  if(rir==null) return null;
-  var unit=e.u, hasLb=(e.s||[]).some(function(x){return x&&+x[0]>0;});
-  if(rir>tgt) return ["add",unit==="sec"?"Add 5 seconds next time":(!hasLb?"Add 2 reps next time":"Add 5 lb per side next time")];
-  if(rir<tgt-1) return ["down","Too heavy: drop 5 lb next time"];
-  return ["keep","Keep the same next time"];
-}
-function lastFor(key,who,before){
-  var best=null;
-  Object.keys(S.docs).forEach(function(id){
-    if(id.indexOf("lift_"+who+"_")!==0) return; var d=S.docs[id]; if(!d||!d.ex||d.date>=before) return;
-    var e=d.ex[key]; if(!e||!(e.s||[]).some(function(x){return x&&(x[0]||x[1]);})) return;
-    if(!best||d.date>best.date) best={date:d.date,e:e};
-  });
-  return best;
-}
-function summarize(e){
-  var sets=(e.s||[]).filter(function(x){return x&&(x[0]||x[1]);});
-  if(!sets.length) return "";
-  var top=sets.reduce(function(a,x){return (+x[0]||0)>(+a[0]||0)?x:a;},sets[0]);
-  var u=e.u==="sec"?" s":" reps";
-  return (top[0]?top[0]+" lb × ":"")+(top[1]||"?")+u+" · "+sets.length+" set"+(sets.length>1?"s":"")+(e.rir!==""&&e.rir!=null?" · "+e.rir+" left":"");
-}
-function renderLift(){
-  var day=DAYS[dow(S.date)], rot=rotation(S.date), wk=rot.wk, el=document.getElementById("panel-lift");
-  var h='<div class="app"><section class="card"><div class="row"><div><span class="eyebrow">'+(rot.pre?"Before week 1":"Cycle "+rot.cycle+" · Week "+wk)+'</span><h2>'+(day?esc(day.n):"Rest day")+'</h2></div><span class="spacer"></span>'+
-    '<div class="seg" role="group" aria-label="Who is lifting"><button type="button" data-who="you" aria-pressed="'+(S.who==="you")+'">You</button><button type="button" data-who="friend" aria-pressed="'+(S.who==="friend")+'">Friend</button></div></div>';
-  if(!day){
-    h+='<p>No lifting today. Do the full core routine, walk, and use the pool or sauna if you like.</p><p class="note">Lifting days are Mon (Push), Tue (Glutes), Thu (Pull), Sat (Circuit). Use the arrows to log a different day.</p><a class="btn" href="coach.html" style="align-self:flex-start;text-decoration:none">Open the core routine</a></section></div>';
-    el.innerHTML=h; return;
-  }
-  h+='<p class="note">Weights are per side. RIR = reps you had left on your last set. Target this week: '+(S.who==="friend"?[4,3,2][wk-1]:[3,2,1][wk-1])+' left.'+(S.who==="friend"?" Pain 3+ means lighten; 5+ means stop.":"")+'</p></section>';
-  var doc=S.docs["lift_"+S.who+"_"+S.date]||{};
-  day.ex.forEach(function(x){
-    var name=S.who==="friend"?x.f:x.y, unit=S.who==="friend"?x.fu:x.yu, tgt=(S.who==="friend"?(x.ftgt||x.tgt):x.tgt)||LIFT[wk];
-    var e=(doc.ex||{})[x.key]||{s:[],rir:"",pain:"",u:unit}; e.u=unit;
-    var last=lastFor(x.key,S.who,S.date), lastHint=last?hintFor(Object.assign({},last.e,{u:unit}),S.who,wk):null, sum=summarize(e), hint=hintFor(e,S.who,wk);
-    h+='<details class="ex" data-key="'+x.key+'"'+(sum?'':' ')+'><summary><span><b>'+esc(name)+'</b><small>'+esc(tgt)+(sum?' · <span id="sum-'+x.key+'">'+esc(sum)+'</span>':'<span id="sum-'+x.key+'"></span>')+'</small></span><span class="pill'+(sum?' ok':'')+'" id="pill-'+x.key+'">'+(sum?"Logged":"Log")+'</span></summary><div class="body">';
-    h+='<p class="last">'+(last?'Last time ('+esc(parse(last.date).toLocaleDateString(undefined,{weekday:"short",month:"numeric",day:"numeric"}))+'): '+esc(summarize(last.e))+(lastHint?' → <b>'+esc(lastHint[1])+'</b>':''):'No earlier log for this move yet. Week 1 starts at 15 lb per side.')+'</p>';
-    h+='<div class="sets"><span></span><span class="h">'+(unit==="lb"?"lb / side":"—")+'</span><span class="h">'+(unit==="sec"?"seconds":"reps")+'</span>';
-    for(var i=0;i<4;i++){var s=(e.s||[])[i]||["",""];
-      h+='<span class="h">Set '+(i+1)+'</span><input type="number" inputmode="decimal" min="0" step="'+(unit==="lb"?"1":"1")+'" data-k="'+x.key+'" data-set="'+i+'" data-f="0" value="'+esc(s[0])+'"'+(unit!=="lb"?' disabled placeholder="—"':'')+' aria-label="Set '+(i+1)+' weight"><input type="number" inputmode="numeric" min="0" data-k="'+x.key+'" data-set="'+i+'" data-f="1" value="'+esc(s[1])+'" aria-label="Set '+(i+1)+' '+(unit==="sec"?"seconds":"reps")+'">';}
-    h+='</div><div class="selrow"><label>Reps left on last set (RIR)<select data-k="'+x.key+'" data-f="rir"><option value="">–</option>'+[0,1,2,3,4,5,6].map(function(v){return '<option'+(String(e.rir)===String(v)?' selected':'')+'>'+v+'</option>';}).join("")+'</select></label>'+
-       '<label>Pain 0–10<select data-k="'+x.key+'" data-f="pain"><option value="">–</option>'+[0,1,2,3,4,5,6,7,8,9,10].map(function(v){return '<option'+(String(e.pain)===String(v)?' selected':'')+'>'+v+'</option>';}).join("")+'</select></label></div>';
-    h+='<div class="hint'+(hint?" "+hint[0]:"")+'" id="hint-'+x.key+'">'+(hint?esc(hint[1]):"Fill in your sets and RIR to get next time's weight")+'</div></div></details>';
-  });
-  el.innerHTML=h+'</div>';
-}
-function liftChange(t){
-  var key=t.dataset.k, id="lift_"+S.who+"_"+S.date, d=clone(S.docs[id]||{who:S.who,date:S.date,ex:{}});
-  d.ex=d.ex||{}; var day=DAYS[dow(S.date)], x=day.ex.filter(function(z){return z.key===key;})[0];
-  var unit=S.who==="friend"?x.fu:x.yu, e=d.ex[key]||{s:[],rir:"",pain:""}; e.u=unit;
-  if(t.dataset.f==="rir"||t.dataset.f==="pain") e[t.dataset.f]=t.value;
-  else { var i=+t.dataset.set; e.s=e.s||[]; while(e.s.length<=i) e.s.push(["",""]); e.s[i][+t.dataset.f]=t.value; }
-  d.ex[key]=e; put(id,d);
-  var wk=rotation(S.date).wk, hint=hintFor(e,S.who,wk), sum=summarize(e);
-  var he=document.getElementById("hint-"+key); he.className="hint"+(hint?" "+hint[0]:""); he.textContent=hint?hint[1]:"Fill in your sets and RIR to get next time's weight";
-  document.getElementById("sum-"+key).textContent=sum?" · "+sum:"";
-  var p=document.getElementById("pill-"+key); p.className="pill"+(sum?" ok":""); p.textContent=sum?"Logged":"Log";
-}
-
 /* ===== Render: body ===== */
 function bodyData(){
   return Object.keys(S.docs).filter(function(k){return k.indexOf("body_")===0&&S.docs[k]&&+S.docs[k].w>0;}).map(function(k){return {d:S.docs[k].date,w:+S.docs[k].w,waist:S.docs[k].waist};}).sort(function(a,b){return a.d<b.d?-1:1;});
@@ -924,7 +883,7 @@ function renderPrep(){
 }
 
 /* ===== Render all ===== */
-function render(){renderHeader();renderSave();if(S.tab==="food")renderFood();if(S.tab==="lift")renderLift();if(S.tab==="body")renderBody();if(S.tab==="prep")renderPrep();}
+function render(){renderHeader();renderSave();if(S.tab==="food")renderFood();if(S.tab==="body")renderBody();if(S.tab==="prep")renderPrep();}
 
 /* ===== Events ===== */
 document.getElementById("prev").addEventListener("click",function(){S.date=addDays(S.date,-1);render();});
@@ -959,10 +918,8 @@ document.getElementById("sheet").addEventListener("submit",function(e){
   if(ai.upc){var mf=clone(myFoods()).filter(function(m){return m.upc!==ai.upc;});mf.unshift({id:"m"+Date.now().toString(36),n:item.n,serving:"",k:item.k,p:item.p,c:item.c,f:0,na:null,sug:null,upc:ai.upc,src:"label",added:today()});put("myfoods",{items:mf.slice(0,200)});}
   choose(item);
 });
-document.getElementById("sheet-q").addEventListener("input",renderPicker);
+document.getElementById("sheet-q").addEventListener("input",function(){if(ai.offq!==document.getElementById("sheet-q").value.toLowerCase().trim()){ai.offres=null;if(!ai.busy)ai.err="";}renderPicker();});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!document.getElementById("sheet").hidden)closePicker();});
-document.getElementById("panel-lift").addEventListener("change",function(e){if(e.target.dataset.k)liftChange(e.target);});
-document.getElementById("panel-lift").addEventListener("click",function(e){var b=e.target.closest("[data-who]");if(b){S.who=b.dataset.who;prefs();renderLift();}});
 document.getElementById("panel-body").addEventListener("click",function(e){
   var b=e.target.closest("[data-exp]"); if(!b) return;
   if(b.dataset.exp==="start") put("exp",{start:today()});
@@ -975,7 +932,7 @@ document.getElementById("panel-prep").addEventListener("change",function(e){var 
 render();
 
 /* ===== Account, sign-in and backup ===== */
-var acct={sent:"",err:"",busy:false,saved:false};
+var acct={sent:"",err:"",busy:false,saved:false,fbBusy:false,fbSent:false,armed:false};
 function renderAccount(){
   var el=document.getElementById("account"), u=AppStore.user(), h='';
   if(S.mode==="db"&&u){
@@ -992,13 +949,22 @@ function renderAccount(){
        '<p class="note">This copy isn\'t connected to a database yet, so entries stay on this device. Export a backup now and then.</p>';
   }
   if(acct.err) h+='<p class="err">'+esc(acct.err)+'</p>';
-  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets"><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="50" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="5" value="'+protNow()+'" required></label><button type="submit" class="btn small">Save</button></form>'+
-     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight.</p>';
+  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets"><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="50" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="5" value="'+protNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
+     '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
+  if(S.mode==="db"){
+    h+='<div class="row"><h3>Report a problem or idea</h3></div>';
+    if(acct.fbSent) h+='<p class="tip">Sent. Thanks, it lands in the owner\'s inbox for the app.</p>';
+    else h+='<form id="fb" class="fb"><select id="fb-kind" class="field" aria-label="Type"><option value="problem">Something\'s broken</option><option value="idea">An idea</option></select><textarea id="fb-msg" class="field" rows="3" maxlength="2000" required placeholder="What happened, or what would help? Say which screen."></textarea><button type="submit" class="btn small"'+(acct.fbBusy?' disabled':'')+'>'+(acct.fbBusy?"Sending…":"Send")+'</button></form><p class="note">Sends your message with your email, the page, and your browser version. No log data.</p>';
+    h+='<div class="row"><h3>Delete my data</h3></div><p class="note">Erases every entry in your account from the server and this device. Your login stays; export a backup first if you might want it back.</p>'+
+       '<div class="row"><button type="button" class="btn small'+(acct.armed?' danger':' ghost')+'" data-acct="delete">'+(acct.armed?"Yes, delete everything":"Delete my data…")+'</button>'+(acct.armed?'<button type="button" class="btn small ghost" data-acct="disarm">Cancel</button>':'')+'</div>';
+  }
   h+='<div class="row"><button type="button" class="btn small ghost" data-acct="export">Export backup</button>'+
      '<label class="btn small ghost" for="import-file" style="cursor:pointer">Import backup</label><input id="import-file" type="file" accept="application/json,.json" class="vh"></div>';
-  var keep=document.activeElement&&document.activeElement.id==="email"?document.getElementById("email").value:null;
+  // Keep whatever the person is typing when the card re-renders (sync status changes often).
+  var keepIds=["email","fb-kind","fb-msg","t-cap","t-prot","t-start"], keep={}, focusId=document.activeElement&&document.activeElement.id;
+  keepIds.forEach(function(id){var f=document.getElementById(id);if(f&&f.value!==""&&(id==="fb-kind"||id==="fb-msg"||id==="email"||focusId===id))keep[id]=f.value;});
   el.innerHTML=h;
-  if(keep!=null){var f=document.getElementById("email");if(f){f.value=keep;f.focus();}}
+  Object.keys(keep).forEach(function(id){var f=document.getElementById(id);if(f){f.value=keep[id];if(focusId===id)f.focus();}});
 }
 function renderWelcome(){
   var el=document.getElementById("welcome"), seen=false; try{seen=!!localStorage.getItem("ct-welcome");}catch(e){}
@@ -1023,7 +989,10 @@ function toggleAccount(open){
 }
 document.getElementById("save").addEventListener("click",function(){toggleAccount(document.getElementById("account").hidden);});
 document.getElementById("account").addEventListener("submit",function(e){
-  if(e.target.id==="targets"){e.preventDefault();var cap=+document.getElementById("t-cap").value,pr=+document.getElementById("t-prot").value;if(!(cap>=1000&&cap<=4000&&pr>=50&&pr<=300))return;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
+  if(e.target.id==="fb"){e.preventDefault();var msg=document.getElementById("fb-msg").value.trim();if(!msg||acct.fbBusy)return;acct.fbBusy=true;acct.err="";renderAccount();
+    AppStore.feedback(document.getElementById("fb-kind").value,msg.slice(0,2000),location.pathname,{ua:navigator.userAgent,app:APP_VERSION,online:navigator.onLine,unsynced:Object.keys(dirty).length,standalone:!!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)})
+      .then(function(){acct.fbSent=true;setTimeout(function(){acct.fbSent=false;},8000);}).catch(function(err){acct.err="Couldn't send: "+(err&&err.message||"try again.");}).then(function(){acct.fbBusy=false;renderAccount();});return;}
+  if(e.target.id==="targets"){e.preventDefault();var cap=+document.getElementById("t-cap").value,pr=+document.getElementById("t-prot").value,sd=document.getElementById("t-start").value;if(!(cap>=1000&&cap<=4000&&pr>=50&&pr<=300&&/^\d{4}-\d{2}-\d{2}$/.test(sd)))return;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr,start:sd}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
   if(e.target.id!=="signin") return; e.preventDefault();
   var email=document.getElementById("email").value.trim(); if(!email) return;
   acct.busy=true;acct.err="";renderAccount();
@@ -1033,6 +1002,15 @@ document.getElementById("account").addEventListener("submit",function(e){
 document.getElementById("account").addEventListener("click",function(e){
   var b=e.target.closest("[data-acct]"); if(!b) return;
   if(b.dataset.acct==="signout"){AppStore.signOut().then(function(){location.reload();});}
+  else if(b.dataset.acct==="disarm"){acct.armed=false;renderAccount();}
+  else if(b.dataset.acct==="delete"){
+    if(!acct.armed){acct.armed=true;renderAccount();return;}
+    acct.armed=false;acct.err="";
+    AppStore.deleteAll().then(function(){
+      ["ct-docs-"+uid,"ct-dirty-"+uid,"fc-logs-"+uid,"fc-dirty-"+uid,"ct-docs","fc-logs","ct-welcome"].forEach(function(k){try{localStorage.removeItem(k);}catch(x){}});
+      dirty={}; S.docs={}; return AppStore.signOut();
+    }).then(function(){location.reload();}).catch(function(err){acct.err="Couldn't delete: "+(err&&err.message||"try again.");renderAccount();});
+  }
   else if(b.dataset.acct==="export"){
     var blob=new Blob([JSON.stringify({app:"cut-tracker",exported:new Date().toISOString(),docs:S.docs},null,1)],{type:"application/json"});
     var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="cut-tracker-backup-"+today()+".json";

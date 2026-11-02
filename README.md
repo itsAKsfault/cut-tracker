@@ -76,3 +76,21 @@ Defaults are 1,500 kcal and 150 g.
   is deleted from Supabase → Authentication → Users.
 - **Food search**: the picker can search Open Food Facts by name (explicit button, so the public
   search API isn't hammered).
+- **Tracks** (3 Nov 2026): the two versions of every move are "Standard" and "SI-safe". The data keys
+  are unchanged (`you` / `friend`), only the labels moved. Pages are written in a neutral voice; no
+  one person's notes appear in the move pop-outs or the Plan, Core and Cooking pages.
+- **Menus** (`MENUS` in `index.html`): a menu is a complete food list plus weekday plan plus prep
+  checklist that a person loads into their own account (account card → Meal menus). Nothing is loaded
+  by default. The list is stored in `settings.menus`; an account whose log already holds cut-menu
+  foods and has no `settings.menus` keeps the cut menu until it is removed. Every menu's foods stay
+  in the global `FOOD` map so old entries render after a menu is removed.
+- **Basics** (`BASICS`): plain foods with typical label values, rounded, grouped in the picker and
+  mixed into search. **Recent**: everything logged in the last 3 weeks, newest first. **Copy
+  yesterday** appears on a day with no entries.
+- **Burn estimate** (Weight tab): a rolling window over the last two full weeks (Sunday–Saturday)
+  estimates maintenance from logged intake and the weight trend once it holds 7+ logged days and 5+
+  weigh-ins over 7+ days. It recomputes every Sunday. The old manual 14-day test (`exp` doc) is gone;
+  stray `exp` rows are ignored.
+- **Swaps** (Form Coach): "Swap" on any move offers the SI-safe option and the other moves in the
+  same group. A swap sticks for that session and track until swapped back and is stored in
+  `fcs_<track>` as `{map:{"<session>:<index>":"<moveId>"}}`. Sets log under the swapped move.

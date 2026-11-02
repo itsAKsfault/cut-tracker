@@ -1,5 +1,5 @@
 /* Offline shell: the app opens with no signal; data calls always go to the network. Bump VERSION on every deploy. */
-var VERSION = "cut-tracker-v11";
+var VERSION = "cut-tracker-v12";
 var SHELL = ["./", "./index.html", "./config.js", "./store.js", "./figures.js", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./plan.css", "./plan.html", "./coach.html", "./core.html", "./cook.html"];
 // The account library comes from a CDN. Without it cached, an offline open falls back to "this phone" mode with an empty log.
 var LIBS = ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"];

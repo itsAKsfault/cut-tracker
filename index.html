@@ -477,7 +477,7 @@ function renderSave(){
   if(S.mode==="db"){el.className="save "+(n?"local":"db");el.textContent=n?(navigator.onLine?"Syncing…":"Offline · "+n+" to sync"):"Saved to your account";}
   else if(S.mode==="local"){el.className="save local";el.textContent=AppStore.enabled?"On this phone · Sign in":"Saved on this phone";}
   else {el.className="save";el.textContent="Loading…";}
-  if(!document.getElementById("account").hidden) renderAccount();
+  if(!document.getElementById("account").hidden&&!acct.editing) renderAccount();
 }
 function renderHeader(){
   var d=parse(S.date),t=today(),rot=rotation(S.date);
@@ -979,7 +979,7 @@ document.getElementById("panel-prep").addEventListener("change",function(e){var 
 render();
 
 /* ===== Account, sign-in and backup ===== */
-var acct={sent:"",err:"",busy:false,saved:false,fbBusy:false,fbSent:false,armed:false};
+var acct={sent:"",err:"",busy:false,saved:false,fbBusy:false,fbSent:false,armed:false,editing:false};
 function renderAccount(){
   var el=document.getElementById("account"), u=AppStore.user(), h='';
   if(S.mode==="db"&&u){
@@ -996,7 +996,7 @@ function renderAccount(){
        '<p class="note">This copy isn\'t connected to a database yet, so entries stay on this device. Export a backup now and then.</p>';
   }
   if(acct.err) h+='<p class="err">'+esc(acct.err)+'</p>';
-  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets"><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="50" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="5" value="'+protNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
+  h+='<div class="row"><h3>Your targets</h3></div><form id="targets" class="targets" novalidate><label for="t-cap">Calorie cap<input id="t-cap" class="field" type="number" inputmode="numeric" min="1000" max="4000" step="1" value="'+capNow()+'" required></label><label for="t-prot">Protein g / day<input id="t-prot" class="field" type="number" inputmode="numeric" min="50" max="300" step="1" value="'+protNow()+'" required></label><label for="t-start">Plan start (a Monday)<input id="t-start" class="field" type="date" value="'+esc(startNow())+'" required></label><button type="submit" class="btn small">Save</button></form>'+
      '<p class="note">'+(acct.saved?'Saved. ':'')+'Defaults are one person\'s numbers (1,500 kcal, 150 g protein), not yours. A rough protein target is 0.7 to 1 g per pound of goal body weight. The start date sets which rotation week you\'re in, here and in Form Coach.</p>';
   if(S.mode==="db"){
     h+='<div class="row"><h3>Report a problem or idea</h3></div>';
@@ -1009,7 +1009,7 @@ function renderAccount(){
      '<label class="btn small ghost" for="import-file" style="cursor:pointer">Import backup</label><input id="import-file" type="file" accept="application/json,.json" class="vh"></div>';
   // Keep whatever the person is typing when the card re-renders (sync status changes often).
   var keepIds=["email","fb-kind","fb-msg","t-cap","t-prot","t-start"], keep={}, focusId=document.activeElement&&document.activeElement.id;
-  keepIds.forEach(function(id){var f=document.getElementById(id);if(f&&f.value!==""&&(id==="fb-kind"||id==="fb-msg"||id==="email"||focusId===id))keep[id]=f.value;});
+  keepIds.forEach(function(id){var f=document.getElementById(id);if(f&&f.value!==""&&(id==="fb-kind"||id==="fb-msg"||id==="email"||focusId===id||(acct.editing&&id.indexOf("t-")===0)))keep[id]=f.value;});
   el.innerHTML=h;
   Object.keys(keep).forEach(function(id){var f=document.getElementById(id);if(f){f.value=keep[id];if(focusId===id)f.focus();}});
 }
@@ -1035,11 +1035,17 @@ function toggleAccount(open){
   if(open) renderAccount();
 }
 document.getElementById("save").addEventListener("click",function(){toggleAccount(document.getElementById("account").hidden);});
+document.getElementById("account").addEventListener("input",function(e){if(e.target.closest&&e.target.closest("#targets"))acct.editing=true;});
 document.getElementById("account").addEventListener("submit",function(e){
   if(e.target.id==="fb"){e.preventDefault();var msg=document.getElementById("fb-msg").value.trim();if(!msg||acct.fbBusy)return;acct.fbBusy=true;acct.err="";renderAccount();
     AppStore.feedback(document.getElementById("fb-kind").value,msg.slice(0,2000),location.pathname,{ua:navigator.userAgent,app:APP_VERSION,online:navigator.onLine,unsynced:Object.keys(dirty).length,standalone:!!(window.matchMedia&&matchMedia("(display-mode: standalone)").matches)})
       .then(function(){acct.fbSent=true;setTimeout(function(){acct.fbSent=false;},8000);}).catch(function(err){acct.err="Couldn't send: "+(err&&err.message||"try again.");}).then(function(){acct.fbBusy=false;renderAccount();});return;}
-  if(e.target.id==="targets"){e.preventDefault();var cap=+document.getElementById("t-cap").value,pr=+document.getElementById("t-prot").value,sd=document.getElementById("t-start").value;if(!(cap>=1000&&cap<=4000&&pr>=50&&pr<=300&&/^\d{4}-\d{2}-\d{2}$/.test(sd)))return;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr,start:sd}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
+  if(e.target.id==="targets"){e.preventDefault();var cap=Math.round(+document.getElementById("t-cap").value),pr=Math.round(+document.getElementById("t-prot").value),sd=document.getElementById("t-start").value;acct.err="";
+    if(!(cap>=1000&&cap<=4000)) acct.err="Calorie cap must be a number from 1,000 to 4,000.";
+    else if(!(pr>=50&&pr<=300)) acct.err="Protein must be a number from 50 to 300 g.";
+    else if(!/^\d{4}-\d{2}-\d{2}$/.test(sd)) acct.err="Pick a plan start date.";
+    if(acct.err){renderAccount();return;}
+    acct.editing=false;put("settings",Object.assign(clone(S.docs.settings||{}),{cap:cap,prot:pr,start:sd}));acct.saved=true;render();renderAccount();setTimeout(function(){acct.saved=false;},4000);return;}
   if(e.target.id!=="signin") return; e.preventDefault();
   var email=document.getElementById("email").value.trim(); if(!email) return;
   acct.busy=true;acct.err="";renderAccount();

@@ -84,6 +84,11 @@ h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:up
 .sum{font-family:var(--mono);font-size:.74rem;color:var(--accent)}
 .logbtn{flex:0 0 auto;border:1px solid var(--line);color:var(--ink);background:var(--surface);padding:6px 10px;cursor:pointer;font-size:.8rem;font-weight:600}
 .logbtn.on{border-color:var(--accent);color:var(--accent)}
+.pose{margin:0 0 14px;display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);padding:10px}
+.pose figcaption{font-size:.86rem;color:var(--muted)}
+.pose figcaption b{color:var(--ink)}
+.fig{width:100%;height:auto;display:block}.fig .body{stroke:var(--ink);stroke-width:5;stroke-linecap:round;stroke-linejoin:round;fill:none}.fig .far{opacity:.35}.fig .prop{stroke:var(--muted);stroke-width:3;fill:none;stroke-linecap:round}.fig .mat{stroke-width:5}.fig .tower{fill:var(--line);stroke:none}.fig .cable{stroke:var(--accent);stroke-width:2.5;fill:none}.fig .handle{fill:var(--accent);stroke:none}.fig .mark{stroke:var(--si);stroke-width:2;fill:none;stroke-dasharray:4 3}.fig .arrow{stroke:var(--si);stroke-width:2.5}.fig .arrowhead{fill:var(--si)}
+@media (max-width:520px){.pose{grid-template-columns:1fr}}
 @media (max-width:760px){.how-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.toolbar{position:static}}
 @media (prefers-reduced-motion:reduce){.progress-bar span{transition:none}}
 @media print{.toolbar,.more,.demo{display:none}}
@@ -103,7 +108,7 @@ h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:up
 
 <div class="callout">
   <strong>Text cues are not a substitute for watching yourself.</strong>
-  <p>I can't embed videos here, and I haven't checked specific ones, so each move links to a search for demos. The Speediance app's movement library also shows its cable moves. Film a set on your phone now and then and compare. For your friend, the physical therapist is the best form check.</p>
+  <p>The end-position figures are schematic drawings, not photos, and the SI-safe variants are described in text rather than drawn. I can't embed videos here, and I haven't checked specific ones, so each move links to a search for demos. The Speediance app's movement library also shows its cable moves. Film a set on your phone now and then and compare. For your friend, the physical therapist is the best form check.</p>
 </div>
 
 <section class="toolbar" aria-label="Session settings">
@@ -172,6 +177,7 @@ h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:up
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="store.js"></script>
+<script src="figures.js"></script>
 <script>
 (function(){
 "use strict";
@@ -343,7 +349,8 @@ function card(id){
   var steps=m.steps.map(function(x){return "<li>"+esc(x)+"</li>";}).join("");
   var bad=m.bad.map(function(x){return "<li>"+esc(x)+"</li>";}).join("");
   var url="https://www.youtube.com/results?search_query="+encodeURIComponent(m.q);
-  return '<div class="how"><div class="how-grid">'+
+  var fig=window.FIG&&FIG.has(id)?'<figure class="pose">'+FIG.svg(id)+'<figcaption><b>End position.</b> '+esc(FIG.caption(id))+' <span class="swap">Dashed ring = the thing to watch.</span></figcaption></figure>':"";
+  return '<div class="how">'+fig+'<div class="how-grid">'+
     '<div><h4>How to do it</h4><ol class="steps">'+steps+'</ol></div>'+
     '<div class="how-side"><div class="breath"><h4>Breathing</h4><p>'+esc(m.br)+'</p></div>'+
     '<div><h4>Common mistakes</h4><ul>'+bad+'</ul></div>'+

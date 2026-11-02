@@ -46,7 +46,11 @@ h4{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:up
 .steps{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px}
 .breath{background:var(--accent-soft);padding:10px 12px;border-left:3px solid var(--accent)}
 .frnote{background:var(--si-soft);padding:10px 12px;border-left:3px solid var(--si)}
-.docnote{background:var(--stop-soft);padding:10px 12px;border-left:3px solid var(--stop)}
+.swaplist{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-top:1px solid var(--line);background:var(--bg)}
+.swaplist .h{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.swaplist .alt{text-align:left;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 10px;border-radius:8px;cursor:pointer;font:inherit}
+.swaplist .alt.def{border-color:var(--accent);color:var(--accent)}
+.swaplist .note{font-size:.76rem;color:var(--muted)}
 .demo{color:var(--accent);font-weight:600}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .stat{background:var(--surface);border:1px solid var(--line);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -239,9 +243,9 @@ var S = [
 ];
 
 /* ---------- State ---------- */
-var st = {who:"you", phase:1, day:today(), tab:"core", logs:{}, lifts:{}, open:{}, openLog:{}};
+var st = {who:"you", phase:1, day:today(), tab:"core", logs:{}, lifts:{}, swaps:{}, open:{}, openLog:{}, openSwap:{}};
 var uid=null, mode="loading", dirty={}, flushing=false, flushFails=0, connecting=false, settings={};
-var PFX="fc_", LPFX="lift_"; // Form Coach rows share the account's docs table with the tracker: check-offs under fc_, lift logs under lift_
+var PFX="fc_", LPFX="lift_", SPFX="fcs_"; // Form Coach rows share the account's docs table with the tracker: check-offs under fc_, lift logs under lift_, move swaps under fcs_<track>
 try{ var p=JSON.parse(localStorage.getItem("fc-prefs")||"{}"); if(p.who)st.who=p.who; if(p.phase)st.phase=p.phase; if(p.tab)st.tab=p.tab; }catch(e){}
 try{ var qp=new URLSearchParams(location.search); if(/^\d{4}-\d{2}-\d{2}$/.test(qp.get("d")||"")) st.day=qp.get("d"); if(qp.get("s")) st.tab=qp.get("s"); }catch(e){}
 
@@ -252,7 +256,7 @@ var LIFTSESS={A:1,B:1,C:1,D:1};
 var LEG_YOU={chest:"chestPress",fly:"fly",shoulder:"shoulderPress",lateral:"lateral",triceps:"triceps",crunchA:"crunch",pallofA:"pallof",bridge:"bridge",squat:"boxSquat",rdl:"rdl",abd:"abduction",birddog:"birdDog",sideplank:"sidePlank",situp:"situp",pulldown:"pulldown",row:"row",onearm:"oneArmRow",facepull:"facePull",curl:"curl",chop:"woodchop",crunchC:"crunch",pushup:"pushup",rowD:"row@D",chestD:"chestPress@D",curlpress:"curlPress@D",plank:"plank@D"};
 var LEG_FR=Object.assign({},LEG_YOU,{crunchA:"deadBug",crunchC:"deadBug",rdl:"pullThrough",abd:"clamshell",situp:"heelTaps",onearm:"row",chop:"pallof",curlpress:"curl@D"});
 function unitFor(id){ return (st.who==="friend"&&UNIT_F[id])||UNIT[id]||"reps"; }
-function liftKey(s,item){ var id=moveFor(item); return s.id==="D"?id+"@D":id; }
+function liftKey(s,item){ var id=moveFor(item,s); return s.id==="D"?id+"@D":id; }
 function migrateLift(doc){ // old tracker keys -> Form Coach keys, in memory
   if(!doc||!doc.ex) return doc; var map=doc.who==="friend"?LEG_FR:LEG_YOU, out={}, changed=false;
   Object.keys(doc.ex).forEach(function(k){ var nk=map[k]||k; if(nk!==k) changed=true; if(!out[nk]) out[nk]=doc.ex[k]; });
@@ -287,7 +291,7 @@ function summarize(e){
   return (top[0]?top[0]+" lb × ":"")+(top[1]||"?")+u+" · "+sets.length+" set"+(sets.length>1?"s":"")+(e.rir!==""&&e.rir!=null?" · "+e.rir+" left":"");
 }
 function logHTML(s,item,i){
-  var k=liftKey(s,item), unit=unitFor(moveFor(item)), e=(liftDoc().ex||{})[k]||{s:[],rir:"",pain:"",u:unit}; e.u=unit;
+  var k=liftKey(s,item), unit=unitFor(moveFor(item,s)), e=(liftDoc().ex||{})[k]||{s:[],rir:"",pain:"",u:unit}; e.u=unit;
   var last=lastFor(k,st.who,st.day), lastHint=last?hintFor(Object.assign({},last.e,{u:unit}),st.who,st.phase):null, hint=hintFor(e,st.who,st.phase);
   var h='<div class="log" id="log-'+i+'"><p class="last">'+(last?'Last time ('+esc(new Date(last.date+"T12:00:00").toLocaleDateString(undefined,{weekday:"short",month:"numeric",day:"numeric"}))+'): '+esc(summarize(last.e))+(lastHint?' → <b>'+esc(lastHint[1])+'</b>':''):'No earlier log for this move. The plan suggests starting around 15 lb per side.')+'</p>';
   h+='<div class="sets"><span></span><span class="h">'+(unit==="lb"?"lb / side":"—")+'</span><span class="h">'+(unit==="sec"?"seconds":"reps")+'</span>';
@@ -305,7 +309,22 @@ function addDays(s,n){ var d=new Date(s+"T12:00:00"); d.setDate(d.getDate()+n); 
 function key(who,day){ return who+"_"+day; }
 function logOf(who,day){ return st.logs[key(who,day)] || {who:who,date:day,done:{}}; }
 function sess(id){ for(var i=0;i<S.length;i++) if(S[i].id===id) return S[i]; return S[0]; }
-function moveFor(item){ return (st.who==="friend" && item[2]) ? item[2] : item[0]; }
+function defaultMove(item){ return (st.who==="friend" && item[2]) ? item[2] : item[0]; }
+// A swap replaces one move in one session for the current track, and stays until swapped back. Sets log under the swapped move.
+function swapFor(s,i){ var d=st.swaps[st.who], v=d&&d.map&&d.map[s.id+":"+i]; return v&&M[v]?v:null; }
+function moveFor(item,s){ var sw=s?swapFor(s,s.items.indexOf(item)):null; return sw||defaultMove(item); }
+function altsFor(def,item){ var out=[]; if(item[2]&&item[2]!==def) out.push(item[2]); if(item[0]!==def) out.push(item[0]); Object.keys(M).forEach(function(id){ if(id!==def&&out.indexOf(id)<0&&M[id].c===M[def].c) out.push(id); }); return out; }
+function setSwap(i,to){
+  var k=st.tab+":"+i, d=JSON.parse(JSON.stringify(st.swaps[st.who]||{who:st.who,map:{}})); d.map=d.map||{};
+  if(to&&M[to]) d.map[k]=to; else delete d.map[k];
+  d.updated=new Date().toISOString(); st.swaps[st.who]=d; st.openSwap[k]=false; queue(SPFX+st.who); render();
+}
+function swapHTML(s,item,i,cur){
+  var def=defaultMove(item), h='<div class="swaplist"><span class="h">Swap this move</span>';
+  if(cur!==def) h+='<button type="button" class="alt def" data-swapto="" data-i="'+i+'">Back to the plan: '+esc(M[def].n)+'</button>';
+  altsFor(def,item).forEach(function(a){ if(a===cur) return; h+='<button type="button" class="alt" data-swapto="'+a+'" data-i="'+i+'">'+esc(M[a].n)+(a===item[2]&&st.who!=="friend"?' · SI-safe option':'')+'</button>'; });
+  return h+'<span class="note">Same muscle group. The swap sticks for this session on the '+(st.who==="you"?"standard":"SI-safe")+' track until you swap back, and sets log under the swapped move.</span></div>';
+}
 function rx(s,item){
   if(item[1]){ return item[1].length===3 ? item[1][st.phase-1] : item[1][0]; }
   return LIFT[st.phase];
@@ -315,14 +334,15 @@ function esc(t){ var d=document.createElement("div"); d.textContent=t; return d.
 
 /* ---------- Device copy ---------- */
 function localKey(){ return uid?"fc-logs-"+uid:"fc-logs"; }
-function loadLocal(k){ var v={}; try{ v=JSON.parse(localStorage.getItem(k||localKey())||"{}")||{}; }catch(e){ v={}; } return v&&v.__v===2?{logs:v.logs||{},lifts:v.lifts||{}}:{logs:v,lifts:{}}; }
-function saveLocal(){ try{ localStorage.setItem(localKey(),JSON.stringify({__v:2,logs:st.logs,lifts:st.lifts})); }catch(e){} }
-function docFor(id){ return id.indexOf(PFX)===0?st.logs[id.slice(PFX.length)]:id.indexOf(LPFX)===0?st.lifts[id.slice(LPFX.length)]:null; }
-function splitRemote(all){ var logs={}, lifts={}; Object.keys(all).forEach(function(id){ if(id.indexOf(PFX)===0) logs[id.slice(PFX.length)]=all[id]; else if(id.indexOf(LPFX)===0) lifts[id.slice(LPFX.length)]=migrateLift(all[id]); }); return {logs:logs,lifts:lifts}; }
+function loadLocal(k){ var v={}; try{ v=JSON.parse(localStorage.getItem(k||localKey())||"{}")||{}; }catch(e){ v={}; } return v&&v.__v===2?{logs:v.logs||{},lifts:v.lifts||{},swaps:v.swaps||{}}:{logs:v,lifts:{},swaps:{}}; }
+function saveLocal(){ try{ localStorage.setItem(localKey(),JSON.stringify({__v:2,logs:st.logs,lifts:st.lifts,swaps:st.swaps})); }catch(e){} }
+function docFor(id){ return id.indexOf(PFX)===0?st.logs[id.slice(PFX.length)]:id.indexOf(LPFX)===0?st.lifts[id.slice(LPFX.length)]:id.indexOf(SPFX)===0?st.swaps[id.slice(SPFX.length)]:null; }
+function cachedDoc(c,id){ return id.indexOf(PFX)===0?c.logs[id.slice(PFX.length)]:id.indexOf(LPFX)===0?c.lifts[id.slice(LPFX.length)]:id.indexOf(SPFX)===0?(c.swaps||{})[id.slice(SPFX.length)]:null; }
+function splitRemote(all){ var logs={}, lifts={}, swaps={}; Object.keys(all).forEach(function(id){ if(id.indexOf(PFX)===0) logs[id.slice(PFX.length)]=all[id]; else if(id.indexOf(LPFX)===0) lifts[id.slice(LPFX.length)]=migrateLift(all[id]); else if(id.indexOf(SPFX)===0) swaps[id.slice(SPFX.length)]=all[id]; }); return {logs:logs,lifts:lifts,swaps:swaps}; }
 function readSettings(all){ var s0=all&&all.settings; if(!s0){ try{ s0=(JSON.parse(localStorage.getItem(uid?"ct-docs-"+uid:"ct-docs")||"{}")||{}).settings; }catch(e){} } settings=s0||{}; var w=weekFor(st.day); if(w) st.phase=w; }
 function saveDirty(){ if(uid) try{ localStorage.setItem("fc-dirty-"+uid,JSON.stringify(Object.keys(dirty))); }catch(e){} }
 function loadDirty(){ try{ return JSON.parse(localStorage.getItem("fc-dirty-"+uid)||"[]")||[]; }catch(e){ return []; } }
-var _d=loadLocal("fc-logs"); st.logs=_d.logs; st.lifts=_d.lifts;
+var _d=loadLocal("fc-logs"); st.logs=_d.logs; st.lifts=_d.lifts; st.swaps=_d.swaps||{};
 
 /* ---------- Render ---------- */
 var $=function(id){return document.getElementById(id);};
@@ -363,15 +383,16 @@ function renderSession(){
   $("bar").style.width=Math.round(100*done.length/s.items.length)+"%";
   var h="";
   s.items.forEach(function(item,i){
-    var id=moveFor(item), m=M[id], k=s.id+":"+i, checked=done.indexOf(i)>=0, open=!!st.open[k];
-    var swapped = st.who==="friend" && item[2] ? '<span class="swap">swap for '+esc(M[item[0]].n)+'</span>' : "";
+    var def=defaultMove(item), sw=swapFor(s,i), id=sw||def, m=M[id], k=s.id+":"+i, checked=done.indexOf(i)>=0, open=!!st.open[k], swOpen=!!st.openSwap[k];
+    var swapped = sw ? '<span class="swap">swapped in for '+esc(M[def].n)+'</span>' : (st.who==="friend" && item[2] ? '<span class="swap">swap for '+esc(M[item[0]].n)+'</span>' : "");
     var lift=!!LIFTSESS[s.id], lk=lift?liftKey(s,item):null, le=lift?(liftDoc().ex||{})[lk]:null, sum=le?summarize(Object.assign({u:unitFor(id)},le)):"", logOpen=lift&&(st.openLog[k]||(!!sum&&st.openLog[k]!==false));
     h+='<li class="move'+(checked?" checked":"")+'" id="li-'+i+'">'+
       '<div class="move-row"><input type="checkbox" id="mv-'+k.replace(":","-")+'" data-i="'+i+'"'+(checked?" checked":"")+'>'+
       '<label for="mv-'+k.replace(":","-")+'"><b>'+esc(m.n)+'</b>'+swapped+'<span class="rx">'+esc(rx(s,item))+'</span>'+(sum?'<span class="sum" id="sum-'+i+'">'+esc(sum)+'</span>':'<span class="sum" id="sum-'+i+'"></span>')+'</label>'+
       (lift?'<button type="button" class="logbtn'+(logOpen?" on":"")+'" data-log="'+k+'" aria-expanded="'+logOpen+'">'+(logOpen?"Hide sets":"Log sets")+'</button>':'')+
+      '<button type="button" class="more" data-swap="'+k+'" aria-expanded="'+swOpen+'">'+(sw?"Swapped":"Swap")+'</button>'+
       '<button type="button" class="more" data-k="'+k+'" aria-expanded="'+open+'">'+(open?"Hide form":"Form")+'</button></div>'+
-      (logOpen?logHTML(s,item,i):"")+(open?card(id):"")+'</li>';
+      (swOpen?swapHTML(s,item,i,id):"")+(logOpen?logHTML(s,item,i):"")+(open?card(id):"")+'</li>';
   });
   $("moves").innerHTML=h;
 }
@@ -428,7 +449,7 @@ function toggle(i,on,quiet){
 }
 function liftChange(t){
   var k=key(st.who,st.day), d=JSON.parse(JSON.stringify(liftDoc())), lk=t.dataset.lk, i=+t.dataset.i, s=sess(st.tab), item=s.items[i];
-  d.ex=d.ex||{}; var e=d.ex[lk]||{s:[],rir:"",pain:""}; e.u=unitFor(moveFor(item));
+  d.ex=d.ex||{}; var e=d.ex[lk]||{s:[],rir:"",pain:""}; e.u=unitFor(moveFor(item,s));
   if(t.dataset.f==="rir"||t.dataset.f==="pain") e[t.dataset.f]=t.value;
   else { var n=+t.dataset.set; e.s=e.s||[]; while(e.s.length<=n) e.s.push(["",""]); e.s[n][+t.dataset.f]=t.value; }
   d.ex[lk]=e; d.updated=new Date().toISOString(); st.lifts[k]=d; queue(LPFX+k);
@@ -445,6 +466,8 @@ document.addEventListener("click",function(e){
   else if(t.dataset.phase){ st.phase=Number(t.dataset.phase); prefs(); render(); }
   else if(t.dataset.tab){ st.tab=t.dataset.tab; prefs(); render(); }
   else if(t.dataset.k){ st.open[t.dataset.k]=!st.open[t.dataset.k]; renderSession(); }
+  else if(t.dataset.swap){ st.openSwap[t.dataset.swap]=!st.openSwap[t.dataset.swap]; renderSession(); }
+  else if(t.dataset.swapto!=null){ setSwap(+t.dataset.i, t.dataset.swapto||null); }
   else if(t.dataset.log){ st.openLog[t.dataset.log]=t.getAttribute("aria-expanded")!=="true"; renderSession(); }
   else if(t.dataset.day){ setDay(t.dataset.day); $("tabs").scrollIntoView({behavior:"smooth",block:"start"}); }
 });
@@ -458,7 +481,7 @@ render(); renderLibrary();
 
 /* ---------- Account storage ---------- */
 function useDevice(){
-  uid=null; mode="local"; var d=loadLocal("fc-logs"); st.logs=d.logs; st.lifts=d.lifts;
+  uid=null; mode="local"; var d=loadLocal("fc-logs"); st.logs=d.logs; st.lifts=d.lifts; st.swaps=d.swaps||{};
   try{ var ct=JSON.parse(localStorage.getItem("ct-docs")||"{}")||{}; Object.keys(ct).forEach(function(id){ if(id.indexOf(LPFX)===0&&!st.lifts[id.slice(LPFX.length)]) st.lifts[id.slice(LPFX.length)]=migrateLift(ct[id]); }); }catch(e){} // lifts logged in the tracker before sign-in
   readSettings(null); render();
 }
@@ -469,20 +492,21 @@ async function connectInner(){
   if(!u){ useDevice(); return; }
   uid=u.id;
   var cached=loadLocal(), device=loadLocal("fc-logs"), all;
-  loadDirty().forEach(function(k){ var id=k.indexOf(PFX)===0||k.indexOf(LPFX)===0?k:PFX+k; if(id.indexOf(PFX)===0?cached.logs[id.slice(PFX.length)]:cached.lifts[id.slice(LPFX.length)]) dirty[id]=true; });
+  loadDirty().forEach(function(k){ var id=(k.indexOf(PFX)===0||k.indexOf(LPFX)===0||k.indexOf(SPFX)===0)?k:PFX+k; if(cachedDoc(cached,id)) dirty[id]=true; });
   try{ all=await AppStore.list(); }
-  catch(e){ st.logs=cached.logs; st.lifts=cached.lifts; mode="db"; readSettings(null); render(); return; } // offline: cached copy, sync later
+  catch(e){ st.logs=cached.logs; st.lifts=cached.lifts; st.swaps=cached.swaps||{}; mode="db"; readSettings(null); render(); return; } // offline: cached copy, sync later
   var r=splitRemote(all);
-  Object.keys(dirty).forEach(function(id){ if(id.indexOf(PFX)===0) r.logs[id.slice(PFX.length)]=cached.logs[id.slice(PFX.length)]; else r.lifts[id.slice(LPFX.length)]=cached.lifts[id.slice(LPFX.length)]; });
+  Object.keys(dirty).forEach(function(id){ var d=cachedDoc(cached,id); if(!d) return; if(id.indexOf(PFX)===0) r.logs[id.slice(PFX.length)]=d; else if(id.indexOf(LPFX)===0) r.lifts[id.slice(LPFX.length)]=d; else r.swaps[id.slice(SPFX.length)]=d; });
   // Carry over checks and sets made on this device before signing in.
   Object.keys(device.logs).forEach(function(k){ var d=device.logs[k]; if(d&&d.done&&Object.keys(d.done).length&&(!r.logs[k]||(d.updated||"")>(r.logs[k].updated||""))){ r.logs[k]=d; dirty[PFX+k]=true; } });
   Object.keys(device.lifts).forEach(function(k){ var d=device.lifts[k]; if(d&&d.ex&&Object.keys(d.ex).length&&(!r.lifts[k]||(d.updated||"")>(r.lifts[k].updated||""))){ r.lifts[k]=d; dirty[LPFX+k]=true; } });
+  Object.keys(device.swaps||{}).forEach(function(k){ var d=device.swaps[k]; if(d&&d.map&&Object.keys(d.map).length&&(!r.swaps[k]||(d.updated||"")>(r.swaps[k].updated||""))){ r.swaps[k]=d; dirty[SPFX+k]=true; } });
   try{ localStorage.removeItem("fc-logs"); }catch(e){}
-  st.logs=r.logs; st.lifts=r.lifts; mode="db"; readSettings(all); saveLocal(); saveDirty(); render(); flush();
+  st.logs=r.logs; st.lifts=r.lifts; st.swaps=r.swaps; mode="db"; readSettings(all); saveLocal(); saveDirty(); render(); flush();
 }
 async function refresh(){
   if(mode!=="db"||flushing||Object.keys(dirty).length) return;
-  try{ var all=await AppStore.list(), r=splitRemote(all); st.logs=r.logs; st.lifts=r.lifts; readSettings(all); saveLocal(); if(!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#moves"))) render(); }catch(e){}
+  try{ var all=await AppStore.list(), r=splitRemote(all); st.logs=r.logs; st.lifts=r.lifts; st.swaps=r.swaps; readSettings(all); saveLocal(); if(!(document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#moves"))) render(); }catch(e){}
 }
 AppStore.onAuthChange(function(u,ev){ if(ev==="SIGNED_IN"&&!uid) connect(); });
 document.addEventListener("visibilitychange",function(){ if(!document.hidden){ flush(); refresh(); } });

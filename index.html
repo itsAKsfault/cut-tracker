@@ -308,7 +308,7 @@ button.save{background:transparent;cursor:pointer}
 <script>
 (function(){
 "use strict";
-var CAP=1500, FLOOR=1200, PROT=150, START="2026-10-19", APP_VERSION="2026-11-02";
+var CAP=1500, FLOOR=1200, PROT=150, START="2026-10-19", APP_VERSION="2026-11-02b";
 
 /* ===== Foods: [id, type, name, kcal, protein, carbs, what's in it, flag] — all rough label estimates.
    CUT_FOODS is one menu (see MENUS below), loaded per account, not the default for everyone. ===== */
@@ -628,7 +628,6 @@ function renderFood(){
   h+='<section class="card"><div class="summary">'+ring(t.k)+'<div class="bars">'+
      bar("Protein",t.p,protNow(),"var(--prot)"," g")+bar("Carbs",t.c,150,"var(--carb)"," g")+
      '<p class="status"><span class="pill '+st[0]+'">'+esc(st[0]==="ok"?"On target":st[0]==="bad"?"Over":"Heads up")+'</span> '+esc(st[1])+'</p></div></div>';
-  var xi=expInfo(); if(xi&&!xi.done&&S.date>=xi.start&&S.date<=xi.end) h+='<p class="note"><b>14-day test, day '+(Math.round((parse(S.date)-parse(xi.start))/864e5)+1)+' of 14.</b> Log everything, even the bad days, drinks and bites included.</p>';
   h+='</section>';
   h+='<section class="card"><div class="row"><h3>Meals</h3><span class="spacer"></span>'+(canCopy?'<button type="button" class="btn small" data-act="copyprev" title="Log the same meals as yesterday">Copy yesterday</button>':'')+'<button type="button" class="btn small" data-act="scan"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:4px"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>Scan a barcode</button></div>';
   SLOTS.forEach(function(sl){
@@ -919,12 +918,12 @@ function aiClick(b){
   else if(a==="again"){resetAI();pick.cat="scan";renderPicker();}
 }
 
-/* ===== Exploratory: 14-day test that estimates maintenance from your own logs and weigh-ins ===== */
+/* ===== Burn estimate: a rolling window over the last two full weeks (Sunday to Saturday) that works out what you burn
+   from what you logged and how your weight moved. It recomputes every Sunday, so the number holds still during the week. ===== */
+function expWindow(){ var end=addDays(weekSunday(today()),-1); return {start:addDays(end,-13),end:end}; }
 function expInfo(){
-  var e=S.docs.exp; if(!e||!e.start) return null;
-  var start=e.start, end=addDays(start,13), t=today(), done=t>end, last=done?end:t;
-  var n=Math.max(0,Math.min(14,Math.round((parse(last)-parse(start))/864e5)+1)), logged=[], wts=[];
-  for(var i=0;i<n;i++){var s=addDays(start,i),d=dayDoc(s);if(d&&d.items&&d.items.length)logged.push(totals(d.items).k);var b=S.docs["body_"+s];if(b&&+b.w>0)wts.push([i,+b.w]);}
+  var w=expWindow(), start=w.start, end=w.end, logged=[], wts=[];
+  for(var i=0;i<14;i++){var s=addDays(start,i),d=dayDoc(s);if(d&&d.items&&d.items.length)logged.push(totals(d.items).k);var b=S.docs["body_"+s];if(b&&+b.w>0)wts.push([i,+b.w]);}
   var avg=logged.length?logged.reduce(function(a,k){return a+k;},0)/logged.length:null, fit=null;
   if(wts.length>=5&&wts[wts.length-1][0]-wts[0][0]>=6){
     var mx=0,my=0;wts.forEach(function(p){mx+=p[0];my+=p[1];});mx/=wts.length;my/=wts.length;
@@ -932,8 +931,8 @@ function expInfo(){
     var b1=sxy/sxx,sse=0;wts.forEach(function(p){var r=p[1]-(my+b1*(p[0]-mx));sse+=r*r;});
     fit={slope:b1,se:Math.sqrt(sse/(wts.length-2))/Math.sqrt(sxx)};
   }
-  var maint=avg!=null&&fit?avg-fit.slope*3500:null, half=fit?1.96*fit.se*3500:null;
-  return {start:start,end:end,done:done,n:n,logged:logged.length,weighed:wts.length,avg:avg,fit:fit,maint:maint,half:half};
+  var maint=avg!=null&&fit&&logged.length>=7?avg-fit.slope*3500:null, half=fit?1.96*fit.se*3500:null;
+  return {start:start,end:end,n:14,logged:logged.length,weighed:wts.length,avg:avg,fit:fit,maint:maint,half:half};
 }
 function cmpRow(label,v,max,color){
   var pct=Math.max(0,Math.min(100,v/max*100));
@@ -944,33 +943,25 @@ function rangeRow(lo,hi,max){
   return '<div class="cmp-row"><span class="muted">Likely range</span><div class="cmp-track"><div class="cmp-range" style="left:'+a.toFixed(1)+'%;width:'+Math.max(1,b-a).toFixed(1)+'%"></div></div><b class="muted">±'+fmt((hi-lo)/2)+'</b></div>';
 }
 function expCard(){
-  var x=expInfo(), CAPN=capNow();
-  if(!x) return '<section class="card"><div><span class="eyebrow">Exploratory mode</span><h2>Find your real number</h2></div>'+
-    '<p>The '+fmt(CAPN)+' cap is a starting estimate from averages, not from your body. For 14 days, log everything you eat and weigh in every morning. The app then works out what your body actually burns.</p>'+
-    '<ul class="rules"><li>Log every day, including drinks, bites and cooking oil. A missed day is skipped, not guessed.</li><li>Weigh in each morning: after the bathroom, before eating.</li><li>Eat normally. A "perfect" two weeks gives a number you can\'t live with.</li></ul>'+
-    '<button type="button" class="btn primary" data-exp="start" style="align-self:flex-start">Start the 14-day test today</button></section>';
-  var sd=function(s){return parse(s).toLocaleDateString(undefined,{month:"short",day:"numeric"});};
-  var h='<section class="card"><div class="row"><div><span class="eyebrow">14-day test · '+esc(sd(x.start))+' to '+esc(sd(x.end))+'</span><h2>'+(x.done?"Your results":"Day "+x.n+" of 14")+'</h2></div></div>';
-  h+='<div class="track"><div class="fill" style="width:'+(x.n/14*100).toFixed(0)+'%;background:var(--accent)"></div></div>';
-  h+='<div class="stats"><div class="stat"><b>'+x.logged+'/'+x.n+'</b><span>days logged</span></div><div class="stat"><b>'+x.weighed+'/'+x.n+'</b><span>weigh-ins</span></div>'+
+  var x=expInfo(), CAPN=capNow(), sd=function(s){return parse(s).toLocaleDateString(undefined,{month:"short",day:"numeric"});};
+  var h='<section class="card"><div class="row"><div><span class="eyebrow">What you burn · '+esc(sd(x.start))+' to '+esc(sd(x.end))+'</span><h2>'+(x.maint!=null?"Your two-week estimate":"Find your real number")+'</h2></div></div>';
+  h+='<div class="stats"><div class="stat"><b>'+x.logged+'/14</b><span>days logged</span></div><div class="stat"><b>'+x.weighed+'/14</b><span>weigh-ins</span></div>'+
      '<div class="stat"><b>'+(x.avg!=null?fmt(x.avg):"–")+'</b><span>avg kcal logged</span></div><div class="stat"><b>'+(x.fit?(x.fit.slope<=0?"−":"+")+Math.abs(x.fit.slope*7).toFixed(1):"–")+'</b><span>lb per week (trend)</span></div></div>';
-  if(x.logged<x.n*0.8&&x.n>=3) h+='<p class="tip">Only '+x.logged+' of '+x.n+' days logged so far. Unlogged days are skipped, so the result gets shakier with each one.</p>';
   if(x.maint==null){
-    h+='<p class="note">The estimate appears once there are at least 5 weigh-ins spread over 7+ days and some logged days.</p>';
+    h+='<p>The '+fmt(CAPN)+' cap is a starting estimate from averages, not from your body. Log everything you eat and weigh in every morning. Once the last two full weeks hold at least 7 logged days and 5 weigh-ins spread over a week or more, this card works out what you actually burn. It recomputes every Sunday.</p>'+
+       '<ul class="rules"><li>Log every day, including drinks, bites and cooking oil. A missed day is skipped, not guessed.</li><li>Weigh in each morning: after the bathroom, before eating.</li><li>Eat normally. A "perfect" two weeks gives a number you can\'t live with.</li></ul>';
   }else{
     var lo=Math.max(0,x.maint-x.half),hi=x.maint+x.half,max=Math.max(hi,x.avg,CAPN)*1.08;
     var loss=(x.maint-CAPN)*7/3500, target=Math.round((x.maint-750)/50)*50, sug=Math.max(FLOOR,target);
-    h+='<div><h3>'+(x.done?"What your data says":"Early read")+'</h3></div><div class="cmp">'+
-      cmpRow("You ate (avg)",x.avg,max,"var(--carb)")+cmpRow("You burn (est.)",x.maint,max,"var(--accent)")+rangeRow(lo,hi,max)+cmpRow("Your cap",CAPN,max,"var(--prot)")+'</div>'+
+    if(x.logged<11) h+='<p class="tip">Only '+x.logged+' of 14 days logged. Unlogged days are skipped, so the estimate is shakier than it looks.</p>';
+    h+='<div class="cmp">'+cmpRow("You ate (avg)",x.avg,max,"var(--carb)")+cmpRow("You burn (est.)",x.maint,max,"var(--accent)")+rangeRow(lo,hi,max)+cmpRow("Your cap",CAPN,max,"var(--prot)")+'</div>'+
       '<p class="note">Likely range for what you burn: '+fmt(lo)+'–'+fmt(hi)+' kcal (95%, from how scattered your weigh-ins are). More days and steadier weigh-ins narrow it.</p>';
     h+='<p>At '+fmt(CAPN)+' a day you\'d lose about <b>'+(loss>0?loss.toFixed(1)+' lb a week':'nothing')+'</b> (rough).'+(loss>2?' That\'s faster than about 2 lb a week, which tends to cost muscle.':'')+'</p>';
-    if(x.done){
-      if(Math.abs(sug-CAPN)>=50) h+='<div class="row"><button type="button" class="btn primary" data-exp="cap" data-v="'+sug+'">Set my cap to '+fmt(sug)+'</button><span class="note">'+(target<FLOOR?'1,200 is the floor; loss will be slower than 1.5 lb a week.':'Aims for about 1.5 lb a week.')+'</span></div>';
-      else h+='<p class="note">Your current cap already aims for about 1.5 lb a week. Keep it.</p>';
-    }
-    h+='<p class="tip">Read this with three catches. Early weeks of a cut drop water, which makes the burn look higher than it is. Missed bites and oil make your intake look lower than it was, which pulls the other way. And 3,500 kcal per pound is a rule of thumb, not a law. Run it again in weeks 3–4 for a cleaner number.</p>';
+    if(Math.abs(sug-CAPN)>=50) h+='<div class="row"><button type="button" class="btn primary" data-exp="cap" data-v="'+sug+'">Set my cap to '+fmt(sug)+'</button><span class="note">'+(target<FLOOR?'1,200 is the floor; loss will be slower than 1.5 lb a week.':'Aims for about 1.5 lb a week.')+'</span></div>';
+    else h+='<p class="note">Your current cap already aims for about 1.5 lb a week. Keep it.</p>';
+    h+='<p class="tip">Read this with three catches. Early weeks of a cut drop water, which makes the burn look higher than it is. Missed bites and oil make your intake look lower than it was, which pulls the other way. And 3,500 kcal per pound is a rule of thumb, not a law. The number steadies after a few weeks of logging.</p>';
   }
-  h+='<div class="row">'+(x.done?'<button type="button" class="btn" data-exp="start">Run a new 14-day test</button>':'')+(capNow()!==CAP?'<button type="button" class="btn ghost small" data-exp="cap" data-v="'+CAP+'">Reset cap to '+fmt(CAP)+'</button>':'')+'</div>';
+  if(capNow()!==CAP) h+='<div class="row"><button type="button" class="btn ghost small" data-exp="cap" data-v="'+CAP+'">Reset cap to '+fmt(CAP)+'</button></div>';
   return h+'</section>';
 }
 
@@ -1088,8 +1079,7 @@ document.getElementById("sheet-q").addEventListener("input",function(){if(ai.off
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!document.getElementById("sheet").hidden)closePicker();});
 document.getElementById("panel-body").addEventListener("click",function(e){
   var b=e.target.closest("[data-exp]"); if(!b) return;
-  if(b.dataset.exp==="start") put("exp",{start:today()});
-  else if(b.dataset.exp==="cap") put("settings",Object.assign(clone(S.docs.settings||{}),{cap:+b.dataset.v}));
+  if(b.dataset.exp==="cap") put("settings",Object.assign(clone(S.docs.settings||{}),{cap:+b.dataset.v}));
   renderBody();
 });
 document.getElementById("panel-body").addEventListener("submit",function(e){if(e.target.id!=="wform")return;e.preventDefault();var w=+document.getElementById("w").value,wa=document.getElementById("waist").value;if(!w)return;put("body_"+S.date,{date:S.date,w:w,waist:wa?+wa:null});renderBody();});

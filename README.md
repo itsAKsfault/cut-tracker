@@ -35,3 +35,17 @@ Free-tier limits below are from my training data, so check them when you sign up
 - Free Supabase projects can pause after about a week with no activity (as of my training). Opening the dashboard brings a paused project back. Export a backup now and then.
 - After changing any file, bump `VERSION` in `sw.js` so installed copies pick up the update.
 - On each new day, the Food tab shows the meal plan as a dashed preview. It only saves once you tap "Log as planned" or change something.
+
+## Barcode scanning
+
+"Scan a barcode" on the food tab opens the phone camera (html5-qrcode from cdnjs, loaded only when
+the scanner is opened) and looks the product up in Open Food Facts, a free community database.
+No key is needed. Nutri-Score and NOVA group are shown when the database has them. Results are
+reviewed before logging and saved to My foods with the barcode, so repeat scans never hit the network.
+If a product is missing, "Type numbers" saves the entry under that barcode. Community data can be
+wrong; the app says so on the review screen.
+
+## Targets
+
+Calorie cap and protein target are per account (Settings in the account card under the badge).
+Defaults are 1,500 kcal and 150 g.

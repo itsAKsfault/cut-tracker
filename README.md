@@ -5,7 +5,7 @@ The Cut Tracker as a standalone web app that friends can install to their home s
 It has the same food, lift, weight and prep screens as the Claude page. Two things are different:
 
 - **Saving:** entries save to your account once you sign in. Until then they stay on that phone, and they move into the account at first sign-in. It works offline and syncs when the signal comes back. There's an Export/Import backup on the account card (tap the badge in the top-right corner).
-- **Left out for now:** "Scan a label" and "Describe what you ate". Outside Claude those need a paid Claude API key and a small server. The 48-food menu and "Type numbers" still work.
+- **Changed since launch:** "Scan a label" and "Describe what you ate" (Claude-only) are gone. "Scan a barcode" uses the camera plus Open Food Facts instead; see below.
 
 ## Files
 
